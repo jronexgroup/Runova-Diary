@@ -1,4 +1,5 @@
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'app.dart';
@@ -10,9 +11,15 @@ import 'services/sync_service.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await HiveService.init();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  } catch (e) {
+    debugPrint('Firebase init failed (app will work offline): $e');
+  }
+
   runApp(
     ProviderScope(
       overrides: [
@@ -21,7 +28,11 @@ void main() async {
             ref.watch(hiveServiceProvider),
             ref.watch(firebaseServiceProvider),
           );
-          service.init();
+          try {
+            service.init();
+          } catch (e) {
+            debugPrint('SyncService init failed: $e');
+          }
           return service;
         }),
       ],

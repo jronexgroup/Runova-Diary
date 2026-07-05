@@ -69,10 +69,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      'Runova Diary',
+                      'Runova-Diary',
                       textAlign: TextAlign.center,
                       style: theme.textTheme.headlineSmall?.copyWith(
                         fontWeight: FontWeight.bold,
+                        letterSpacing: 1.2,
                       ),
                     ),
                     const SizedBox(height: 8),

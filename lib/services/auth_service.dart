@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
+import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 import '../models/user.dart';
 import 'firebase_service.dart';
@@ -33,7 +34,9 @@ class AuthService {
       createdAt: DateTime.now(),
     );
     await _hiveService.saveUser(user);
-    await _firebaseService.saveUser(user);
+    _firebaseService.saveUser(user).catchError((e) {
+      debugPrint('Firebase saveUser failed (offline): $e');
+    });
     return user;
   }
 
@@ -48,10 +51,14 @@ class AuthService {
       return localUser;
     }
 
-    final fbUser = await _firebaseService.getUser(phoneNumber);
-    if (fbUser != null && fbUser.pinHash == _hashPin(pin)) {
-      await _hiveService.saveUser(fbUser);
-      return fbUser;
+    try {
+      final fbUser = await _firebaseService.getUser(phoneNumber);
+      if (fbUser != null && fbUser.pinHash == _hashPin(pin)) {
+        await _hiveService.saveUser(fbUser);
+        return fbUser;
+      }
+    } catch (e) {
+      debugPrint('Firebase login fallback failed: $e');
     }
 
     return null;
@@ -71,6 +78,8 @@ class AuthService {
     if (user.pinHash != _hashPin(oldPin)) throw Exception('Incorrect current PIN');
     final updated = user.copyWith(pinHash: _hashPin(newPin));
     await _hiveService.saveUser(updated);
-    await _firebaseService.saveUser(updated);
+    _firebaseService.saveUser(updated).catchError((e) {
+      debugPrint('Firebase saveUser (pin change) failed: $e');
+    });
   }
 }
