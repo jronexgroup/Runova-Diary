@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "136502856672",
+    "project_id": "runova-diary",
+    "storage_bucket": "runova-diary.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:136502856672:android:6c0b4280f23b6615267985",
+        "android_client_info": {
+          "package_name": "com.runova.runova_diary"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "136502856672-nj12co8ebbr9s2ae81npfi0l358cs66s.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDKPSsRup2SgN04pfx7_Ae0PqkCR7z34ro"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "136502856672-nj12co8ebbr9s2ae81npfi0l358cs66s.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}                                                                                               

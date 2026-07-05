@@ -1,0 +1,83 @@
+import 'dart:convert';
+import 'package:hive_flutter/hive_flutter.dart';
+import '../models/transaction.dart';
+import '../models/daily_balance.dart';
+import '../models/user.dart';
+import '../utils/constants.dart';
+
+class HiveService {
+  static Future<void> init() async {
+    await Hive.initFlutter();
+    await Hive.openBox(AppConstants.hiveTransactionsBox);
+    await Hive.openBox(AppConstants.hiveBalancesBox);
+    await Hive.openBox(AppConstants.hiveUserBox);
+    await Hive.openBox(AppConstants.hiveSettingsBox);
+  }
+
+  Box get _txBox => Hive.box(AppConstants.hiveTransactionsBox);
+  Box get _balBox => Hive.box(AppConstants.hiveBalancesBox);
+  Box get _userBox => Hive.box(AppConstants.hiveUserBox);
+
+  Future<void> saveUser(AppUser user) async {
+    await _userBox.put('current', jsonEncode(user.toJson()));
+  }
+
+  AppUser? getUser() {
+    final data = _userBox.get('current') as String?;
+    if (data == null) return null;
+    return AppUser.fromJson(jsonDecode(data) as Map<String, dynamic>);
+  }
+
+  Future<void> clearUser() async {
+    await _userBox.delete('current');
+  }
+
+  Future<void> saveTransaction(Transaction transaction) async {
+    final key = '${transaction.userId}_${transaction.id}';
+    await _txBox.put(key, jsonEncode(transaction.toJson()));
+  }
+
+  Future<void> deleteTransaction(String userId, String transactionId) async {
+    final key = '${userId}_$transactionId';
+    await _txBox.delete(key);
+  }
+
+  List<Transaction> getTransactions(String userId) {
+    final transactions = <Transaction>[];
+    for (final key in _txBox.keys) {
+      if (key.toString().startsWith('${userId}_')) {
+        final data = _txBox.get(key) as String;
+        final txn = Transaction.fromJson(
+          jsonDecode(data) as Map<String, dynamic>,
+        );
+        transactions.add(txn);
+      }
+    }
+    transactions.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return transactions;
+  }
+
+  Future<void> saveBalance(DailyBalance balance) async {
+    final key = '${balance.userId}_${balance.dateKey}';
+    await _balBox.put(key, jsonEncode(balance.toJson()));
+  }
+
+  DailyBalance? getBalance(String userId, String dateKey) {
+    final key = '${userId}_$dateKey';
+    final data = _balBox.get(key) as String?;
+    if (data == null) return null;
+    return DailyBalance.fromJson(jsonDecode(data) as Map<String, dynamic>);
+  }
+
+  List<DailyBalance> getAllBalances(String userId) {
+    final balances = <DailyBalance>[];
+    for (final key in _balBox.keys) {
+      if (key.toString().startsWith('${userId}_')) {
+        final data = _balBox.get(key) as String;
+        balances.add(DailyBalance.fromJson(jsonDecode(data) as Map<String, dynamic>));
+      }
+    }
+    balances.sort((a, b) => b.dateKey.compareTo(a.dateKey));
+    return balances;
+  }
+}
