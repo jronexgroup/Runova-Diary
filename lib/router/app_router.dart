@@ -14,10 +14,27 @@ import '../screens/settings_screen.dart';
 import '../utils/constants.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
-  ref.watch(authProvider);
+  final isLoggedIn = ref.watch(authProvider) != null;
 
   return GoRouter(
     initialLocation: '/splash',
+    redirect: (context, state) {
+      final isSplash = state.matchedLocation == '/splash';
+      final isLogin = state.matchedLocation == '/login';
+      final isRegister = state.matchedLocation == '/register';
+
+      if (isSplash) return null;
+
+      if (!isLoggedIn && !isLogin && !isRegister) {
+        return '/login';
+      }
+
+      if (isLoggedIn && (isLogin || isRegister)) {
+        return '/dashboard';
+      }
+
+      return null;
+    },
     routes: [
       GoRoute(
         path: '/splash',
