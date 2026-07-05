@@ -8,9 +8,9 @@ class AppTheme {
       brightness: Brightness.light,
       textTheme: _textTheme,
       appBarTheme: const AppBarTheme(centerTitle: true),
-      cardTheme: const CardTheme(
+      cardTheme: CardThemeData(
         elevation: 2,
-        margin: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
@@ -38,9 +38,9 @@ class AppTheme {
       brightness: Brightness.dark,
       textTheme: _textTheme,
       appBarTheme: const AppBarTheme(centerTitle: true),
-      cardTheme: const CardTheme(
+      cardTheme: CardThemeData(
         elevation: 2,
-        margin: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
