@@ -13,12 +13,14 @@ import '../screens/reports_screen.dart';
 import '../screens/settings_screen.dart';
 import '../utils/constants.dart';
 
-final routerProvider = Provider<GoRouter>((ref) {
-  final isLoggedIn = ref.watch(authProvider) != null;
+final _navigatorKey = GlobalKey<NavigatorState>();
 
+final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
+    navigatorKey: _navigatorKey,
     initialLocation: '/splash',
     redirect: (context, state) {
+      final isLoggedIn = ref.read(authProvider) != null;
       final isSplash = state.matchedLocation == '/splash';
       final isLogin = state.matchedLocation == '/login';
       final isRegister = state.matchedLocation == '/register';
@@ -85,5 +87,3 @@ final routerProvider = Provider<GoRouter>((ref) {
     ],
   );
 });
-
-final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
