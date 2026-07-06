@@ -508,7 +508,7 @@ class _TransactionHistoryScreenState
                               style: const TextStyle(fontWeight: FontWeight.w500),
                             ),
                             subtitle: Text(
-                              '₹${txn.amount.toStringAsFixed(0)} • ${txn.createdAt.displayTime}',
+                              '₹${txn.amount.toStringAsFixed(2)} • ${txn.createdAt.displayTime}',
                             ),
                             trailing: _multiSelectMode
                                 ? null

@@ -72,7 +72,7 @@ class TransactionDetailScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 16),
           _detailTile(theme, 'Customer Name', txn.customerName, Icons.person),
-          _detailTile(theme, 'Amount', '₹${txn.amount.toStringAsFixed(0)}', Icons.currency_rupee),
+          _detailTile(theme, 'Amount', '₹${txn.amount.toStringAsFixed(2)}', Icons.currency_rupee),
           if (txn.bankName != null)
             _detailTile(theme, 'Bank Name', txn.bankName!, Icons.account_balance),
           if (txn.aadhaarNumber != null)
@@ -83,8 +83,8 @@ class TransactionDetailScreen extends ConsumerWidget {
             _detailTile(theme, 'Transaction ID', txn.transactionId!, Icons.receipt),
           if (txn.phonePeAccount != null)
             _detailTile(theme, 'PhonePe Account', txn.phonePeAccount!.displayName, Icons.phone_android),
-          _detailTile(theme, 'Balance After', '₹${txn.balanceAfterTransaction.toStringAsFixed(0)}', Icons.account_balance_wallet),
-          _detailTile(theme, 'Commission', '₹${txn.commission.toStringAsFixed(0)}', Icons.monetization_on),
+          _detailTile(theme, 'Balance After', '₹${txn.balanceAfterTransaction.toStringAsFixed(2)}', Icons.account_balance_wallet),
+          _detailTile(theme, 'Commission', '₹${txn.commission.toStringAsFixed(2)}', Icons.monetization_on),
           _detailTile(theme, 'Date & Time', txn.createdAt.displayDateTime, Icons.schedule),
           if (txn.notes != null && txn.notes!.isNotEmpty)
             _detailTile(theme, 'Notes', txn.notes!, Icons.notes),
