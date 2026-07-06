@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -87,7 +88,40 @@ class TransactionDetailScreen extends ConsumerWidget {
           _detailTile(theme, 'Date & Time', txn.createdAt.displayDateTime, Icons.schedule),
           if (txn.notes != null && txn.notes!.isNotEmpty)
             _detailTile(theme, 'Notes', txn.notes!, Icons.notes),
+          if (txn.signatureData != null)
+            _signatureCard(theme, txn.signatureData!),
         ],
+      ),
+    );
+  }
+
+  Widget _signatureCard(ThemeData theme, String signatureData) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.edit, size: 18, color: theme.colorScheme.primary),
+                const SizedBox(width: 6),
+                Text('Signature', style: theme.textTheme.labelLarge),
+              ],
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 120,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: CustomPaint(
+                  painter: _SignatureDisplayPainter(signatureData),
+                  size: const Size(double.infinity, 120),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -101,4 +135,51 @@ class TransactionDetailScreen extends ConsumerWidget {
       ),
     );
   }
+}
+
+class _SignatureDisplayPainter extends CustomPainter {
+  final List<List<List<double>>> strokes;
+
+  _SignatureDisplayPainter(String json) : strokes = _parse(json);
+
+  static List<List<List<double>>> _parse(String json) {
+    try {
+      final data = jsonDecode(json) as List;
+      return data.map((s) {
+        return (s as List).map((p) => (p as List).cast<double>()).toList();
+      }).toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.black87
+      ..strokeWidth = 2.5
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+
+    for (final stroke in strokes) {
+      if (stroke.isEmpty) continue;
+      if (stroke.length == 1) {
+        canvas.drawCircle(
+          Offset(stroke[0][0], stroke[0][1]),
+          paint.strokeWidth / 2,
+          paint,
+        );
+        continue;
+      }
+      final path = Path();
+      path.moveTo(stroke[0][0], stroke[0][1]);
+      for (int i = 1; i < stroke.length; i++) {
+        path.lineTo(stroke[i][0], stroke[i][1]);
+      }
+      canvas.drawPath(path, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

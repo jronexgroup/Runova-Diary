@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../providers/providers.dart';
 import '../utils/constants.dart';
 import '../utils/date_utils.dart';
+import '../widgets/signature_pad.dart';
 
 class NewTransactionScreen extends ConsumerStatefulWidget {
   final TransactionType type;
@@ -29,6 +30,7 @@ class _NewTransactionScreenState extends ConsumerState<NewTransactionScreen> {
   bool _loading = false;
   bool _commissionOverridden = false;
   bool _autoCommission = true;
+  final _signatureNotifier = ValueNotifier<String?>(null);
 
   @override
   void dispose() {
@@ -40,6 +42,7 @@ class _NewTransactionScreenState extends ConsumerState<NewTransactionScreen> {
     _notesController.dispose();
     _bankNameController.dispose();
     _commissionController.dispose();
+    _signatureNotifier.dispose();
     super.dispose();
   }
 
@@ -118,6 +121,7 @@ class _NewTransactionScreenState extends ConsumerState<NewTransactionScreen> {
         phonePeAccount: _selectedAccount,
         commission: commission,
         commissionOverridden: _commissionOverridden,
+        signatureData: _signatureNotifier.value,
       );
 
       if (!mounted) return;
@@ -312,14 +316,18 @@ class _NewTransactionScreenState extends ConsumerState<NewTransactionScreen> {
                 ),
               ],
               const SizedBox(height: 16),
-              TextFormField(
-                controller: _mobileController,
-                keyboardType: TextInputType.phone,
-                decoration: const InputDecoration(
-                  labelText: 'Mobile Number (optional)',
-                  prefixIcon: Icon(Icons.phone),
+              if (isAEPS) ...[
+                SignaturePad(notifier: _signatureNotifier),
+              ] else ...[
+                TextFormField(
+                  controller: _mobileController,
+                  keyboardType: TextInputType.phone,
+                  decoration: const InputDecoration(
+                    labelText: 'Mobile Number (optional)',
+                    prefixIcon: Icon(Icons.phone),
+                  ),
                 ),
-              ),
+              ],
               const SizedBox(height: 16),
               TextFormField(
                 controller: _txnIdController,

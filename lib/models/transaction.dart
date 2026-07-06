@@ -21,6 +21,7 @@ class Transaction {
   final double balanceAfterTransaction;
   final DateTime createdAt;
   final String userId;
+  final String? signatureData;
 
   const Transaction({
     required this.id,
@@ -38,6 +39,7 @@ class Transaction {
     this.notes,
     this.bankName,
     this.phonePeAccount,
+    this.signatureData,
   });
 
   Transaction copyWith({
@@ -56,6 +58,7 @@ class Transaction {
     double? balanceAfterTransaction,
     DateTime? createdAt,
     String? userId,
+    String? signatureData,
   }) {
     return Transaction(
       id: id ?? this.id,
@@ -73,6 +76,7 @@ class Transaction {
       balanceAfterTransaction: balanceAfterTransaction ?? this.balanceAfterTransaction,
       createdAt: createdAt ?? this.createdAt,
       userId: userId ?? this.userId,
+      signatureData: signatureData ?? this.signatureData,
     );
   }
 
@@ -92,6 +96,7 @@ class Transaction {
     'balanceAfterTransaction': balanceAfterTransaction,
     'createdAt': createdAt.toIso8601String(),
     'userId': userId,
+    'signatureData': signatureData,
   };
 
   factory Transaction.fromJson(Map<String, dynamic> json, {String? idOverride}) {
@@ -113,6 +118,7 @@ class Transaction {
       balanceAfterTransaction: (json['balanceAfterTransaction'] as num).toDouble(),
       createdAt: DateTime.parse(json['createdAt'] as String),
       userId: json['userId'] as String,
+      signatureData: json['signatureData'] as String?,
     );
   }
 
@@ -130,6 +136,7 @@ class Transaction {
     PhonePeAccount? phonePeAccount,
     double? commission,
     bool commissionOverridden = false,
+    String? signatureData,
   }) {
     final now = DateTime.now();
     final commissionValue = commission ?? _calculateCommission(amount, type);
@@ -149,11 +156,14 @@ class Transaction {
       notes: notes,
       bankName: bankName,
       phonePeAccount: phonePeAccount,
+      signatureData: signatureData,
     );
   }
 
   static double _calculateCommission(double amount, TransactionType type) {
     if (type != TransactionType.aeps) return 0;
-    return (amount / 1000).ceil() * 10.0;
+    final base = (amount / 1000).ceil() * 10.0;
+    final extra = (amount / 10000).ceil() * 13.0;
+    return base + extra;
   }
 }

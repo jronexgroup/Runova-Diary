@@ -3,10 +3,15 @@ import '../utils/constants.dart';
 class CommissionService {
   double calculateCommission(double amount, TransactionType type) {
     if (amount <= 0) return 0;
-    if (type == TransactionType.aeps || type == TransactionType.cashIn || type == TransactionType.cashOut) {
-      return (amount / 1000).ceil() * 10.0;
+    switch (type) {
+      case TransactionType.aeps:
+        final base = (amount / 1000).ceil() * 10.0;
+        final extra = (amount / 10000).ceil() * 13.0;
+        return base + extra;
+      case TransactionType.cashIn:
+      case TransactionType.cashOut:
+        return (amount / 1000).ceil() * 10.0;
     }
-    return 0;
   }
 
   (double baseAmount, double commission) smartDetect(double total) {

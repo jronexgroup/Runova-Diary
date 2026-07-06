@@ -113,6 +113,7 @@ class TransactionsNotifier extends StateNotifier<List<Transaction>> {
     PhonePeAccount? phonePeAccount,
     double? commission,
     bool commissionOverridden = false,
+    String? signatureData,
   }) async {
     final txn = Transaction.create(
       type: type,
@@ -128,6 +129,7 @@ class TransactionsNotifier extends StateNotifier<List<Transaction>> {
       phonePeAccount: phonePeAccount,
       commission: commission,
       commissionOverridden: commissionOverridden,
+      signatureData: signatureData,
     );
     final hive = _ref.read(hiveServiceProvider);
     await hive.saveTransaction(txn);
