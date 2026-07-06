@@ -120,7 +120,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   leading: const Icon(Icons.add_circle),
                   title: const Text('Add Balance'),
                   trailing: const Icon(Icons.chevron_right),
-                  onTap: () => _showAddBalance(),
+                  onTap: () => _showAdjustBalance(true),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.remove_circle_outline, color: Colors.red),
+                  title: const Text('Decrease Balance', style: TextStyle(color: Colors.red)),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => _showAdjustBalance(false),
                 ),
               ],
             ),
@@ -248,7 +255,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  void _showAddBalance() {
+  void _showAdjustBalance(bool isAdd) {
     final user = ref.read(authProvider);
     if (user == null) return;
 
@@ -265,7 +272,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
-          title: const Text('Add Balance'),
+          title: Text(isAdd ? 'Add Balance' : 'Decrease Balance'),
           content: Form(
             key: formKey,
             child: Column(
@@ -343,13 +350,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 double hasibulOpening = balance.hasibulOpeningBalance;
                 double runaLailaOpening = balance.runaLailaOpeningBalance;
 
+                final delta = isAdd ? amount : -amount;
                 switch (selectedAccount) {
                   case 'aeps':
-                    aepsOpening += amount;
+                    aepsOpening += delta;
                   case 'hasibul':
-                    hasibulOpening += amount;
+                    hasibulOpening += delta;
                   case 'runaLaila':
-                    runaLailaOpening += amount;
+                    runaLailaOpening += delta;
                 }
 
                 await ref.read(balancesProvider.notifier).updateOpeningBalances(
@@ -360,14 +368,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   runaLailaOpening: runaLailaOpening,
                 );
 
-                if (ctx.mounted) {
-                  Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Balance added successfully')),
-                  );
-                }
-              },
-              child: const Text('Add'),
+              if (ctx.mounted) {
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(isAdd ? 'Balance added' : 'Balance decreased')),
+                );
+              }
+            },
+            child: Text(isAdd ? 'Add' : 'Decrease'),
             ),
           ],
         ),

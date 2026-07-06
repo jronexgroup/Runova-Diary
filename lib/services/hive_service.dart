@@ -4,6 +4,7 @@ import '../models/transaction.dart';
 import '../models/daily_balance.dart';
 import '../models/user.dart';
 import '../utils/constants.dart';
+import '../utils/date_utils.dart';
 
 class HiveService {
   static Future<void> init() async {
@@ -55,6 +56,28 @@ class HiveService {
     }
     transactions.sort((a, b) => b.createdAt.compareTo(a.createdAt));
     return transactions;
+  }
+
+  Future<void> deleteBalance(String userId, String dateKey) async {
+    final key = '${userId}_$dateKey';
+    await _balBox.delete(key);
+  }
+
+  Future<int> deleteTransactionsForDate(String userId, String dateKey) async {
+    final toDelete = <dynamic>[];
+    for (final key in _txBox.keys) {
+      if (key.toString().startsWith('${userId}_')) {
+        final data = _txBox.get(key) as String;
+        final txn = Transaction.fromJson(jsonDecode(data) as Map<String, dynamic>);
+        if (txn.createdAt.dateKey == dateKey) {
+          toDelete.add(key);
+        }
+      }
+    }
+    for (final key in toDelete) {
+      await _txBox.delete(key);
+    }
+    return toDelete.length;
   }
 
   Future<void> saveBalance(DailyBalance balance) async {

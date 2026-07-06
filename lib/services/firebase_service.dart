@@ -83,6 +83,19 @@ class FirebaseService {
     }
   }
 
+  Future<void> deleteBalance(String userId, String dateKey) async {
+    try {
+      await _firestore
+          .collection(AppConstants.usersCollection)
+          .doc(userId)
+          .collection(AppConstants.dailyBalancesCollection)
+          .doc(dateKey)
+          .delete();
+    } catch (e) {
+      debugPrint('Firebase deleteBalance error: $e');
+    }
+  }
+
   Future<void> saveBalance(DailyBalance balance) async {
     try {
       await _firestore

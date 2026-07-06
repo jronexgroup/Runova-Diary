@@ -27,15 +27,8 @@ class _NewTransactionScreenState extends ConsumerState<NewTransactionScreen> {
 
   PhonePeAccount? _selectedAccount;
   bool _loading = false;
-  bool _overrideCommission = false;
-
-  @override
-  void initState() {
-    super.initState();
-    if (widget.type == TransactionType.aeps) {
-      _overrideCommission = false;
-    }
-  }
+  bool _commissionOverridden = false;
+  bool _autoCommission = true;
 
   @override
   void dispose() {
@@ -53,7 +46,17 @@ class _NewTransactionScreenState extends ConsumerState<NewTransactionScreen> {
   double? get _calculatedCommission {
     final amount = double.tryParse(_amountController.text);
     if (amount == null || amount <= 0) return null;
+    if (!_autoCommission) return null;
+    if (widget.type == TransactionType.cashIn || widget.type == TransactionType.cashOut) {
+      final (_, commission) = ref.read(commissionServiceProvider).smartDetect(amount);
+      return commission;
+    }
     return ref.read(commissionServiceProvider).calculateCommission(amount, widget.type);
+  }
+
+  bool get _hasDetectedCommission {
+    final c = _calculatedCommission;
+    return c != null && c > 0;
   }
 
   Future<void> _submit() async {
@@ -91,9 +94,9 @@ class _NewTransactionScreenState extends ConsumerState<NewTransactionScreen> {
       newBalance = currentBal - amount;
     }
 
-    final commission = _overrideCommission
-        ? double.tryParse(_commissionController.text) ?? 0
-        : (_calculatedCommission ?? 0);
+    final commission = _commissionOverridden
+        ? (double.tryParse(_commissionController.text) ?? 0.0)
+        : (_autoCommission ? (_calculatedCommission ?? 0.0) : 0.0);
 
     try {
       await ref.read(transactionsProvider.notifier).addTransaction(
@@ -114,7 +117,7 @@ class _NewTransactionScreenState extends ConsumerState<NewTransactionScreen> {
             ? null : _bankNameController.text.trim(),
         phonePeAccount: _selectedAccount,
         commission: commission,
-        commissionOverridden: _overrideCommission,
+        commissionOverridden: _commissionOverridden,
       );
 
       if (!mounted) return;
@@ -185,6 +188,30 @@ class _NewTransactionScreenState extends ConsumerState<NewTransactionScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              if (_hasDetectedCommission) ...[
+                Card(
+                  color: theme.colorScheme.primaryContainer,
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Row(
+                      children: [
+                        Icon(Icons.lightbulb, color: theme.colorScheme.onPrimaryContainer),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Detected: ₹${(_calculatedCommission!).toStringAsFixed(0)} commission included',
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: theme.colorScheme.onPrimaryContainer,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
               TextFormField(
                 controller: _customerNameController,
                 decoration: const InputDecoration(
@@ -310,40 +337,54 @@ class _NewTransactionScreenState extends ConsumerState<NewTransactionScreen> {
                   prefixIcon: Icon(Icons.notes),
                 ),
               ),
-              if (isAEPS) ...[
-                const SizedBox(height: 16),
-                if (_calculatedCommission != null) ...[
-                  Card(
-                    child: ListTile(
-                      leading: Icon(Icons.monetization_on, color: theme.colorScheme.primary),
-                      title: const Text('Auto Commission'),
-                      trailing: Text(
-                        '₹${_calculatedCommission!.toStringAsFixed(0)}',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
+              const SizedBox(height: 16),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  child: Row(
+                    children: [
+                      Icon(Icons.monetization_on, color: theme.colorScheme.primary),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _autoCommission
+                              ? (_calculatedCommission != null
+                                  ? 'Commission: ₹${_calculatedCommission!.toStringAsFixed(0)}'
+                                  : 'Auto Commission ON')
+                              : 'Auto Commission OFF',
+                          style: theme.textTheme.bodyLarge,
                         ),
                       ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  CheckboxListTile(
-                    title: const Text('Override Commission'),
-                    value: _overrideCommission,
-                    onChanged: (v) => setState(() => _overrideCommission = v ?? false),
-                    controlAffinity: ListTileControlAffinity.trailing,
-                  ),
-                  if (_overrideCommission) ...[
-                    const SizedBox(height: 8),
-                    TextFormField(
-                      controller: _commissionController,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        labelText: 'Commission Amount',
-                        prefixIcon: Icon(Icons.monetization_on),
+                      TextButton.icon(
+                        onPressed: () => setState(() => _autoCommission = !_autoCommission),
+                        icon: Icon(
+                          _autoCommission ? Icons.toggle_on : Icons.toggle_off_outlined,
+                          color: _autoCommission ? Colors.green : Colors.grey,
+                          size: 28,
+                        ),
+                        label: Text(_autoCommission ? 'ON' : 'OFF'),
                       ),
-                    ),
-                  ],
-                ],
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              CheckboxListTile(
+                title: const Text('Override Commission'),
+                value: _commissionOverridden,
+                onChanged: (v) => setState(() => _commissionOverridden = v ?? false),
+                controlAffinity: ListTileControlAffinity.trailing,
+              ),
+              if (_commissionOverridden) ...[
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: _commissionController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Commission Amount',
+                    prefixIcon: Icon(Icons.monetization_on),
+                  ),
+                ),
               ],
               const SizedBox(height: 24),
               ElevatedButton(

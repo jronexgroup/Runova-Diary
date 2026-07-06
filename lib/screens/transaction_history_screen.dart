@@ -21,6 +21,8 @@ class _TransactionHistoryScreenState
   DateTime? _startDate;
   DateTime? _endDate;
   bool _showFilters = false;
+  bool _multiSelectMode = false;
+  final Set<String> _selectedIds = {};
 
   @override
   void dispose() {
@@ -118,6 +120,89 @@ class _TransactionHistoryScreenState
     }
   }
 
+  Future<void> _deleteSelected() async {
+    if (_selectedIds.isEmpty) return;
+
+    final pinOk = await _requirePin();
+    if (!pinOk) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Incorrect PIN')),
+        );
+      }
+      return;
+    }
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Selected'),
+        content: Text('Delete ${_selectedIds.length} transaction(s)?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete All', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    final txns = ref.read(transactionsProvider);
+    for (final txn in txns.where((t) => _selectedIds.contains(t.id))) {
+      await ref.read(transactionsProvider.notifier)
+          .deleteTransaction(txn.userId, txn.id, txn.createdAt.dateKey);
+    }
+
+    setState(() {
+      _multiSelectMode = false;
+      _selectedIds.clear();
+    });
+  }
+
+  Future<void> _deleteTransactionsForDate(DateTime date) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Date'),
+        content: Text('Delete all transactions for ${date.displayDate}?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete All', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    final pinOk = await _requirePin();
+    if (!pinOk) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Incorrect PIN')),
+        );
+      }
+      return;
+    }
+
+    final user = ref.read(authProvider);
+    if (user == null) return;
+
+    final dateKey = date.dateKey;
+    await ref.read(transactionsProvider.notifier).deleteTransactionsForDate(user.id, dateKey);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Transactions deleted for ${date.displayDate}')),
+      );
+    }
+  }
+
   Future<void> _duplicateTransaction(Transaction txn) async {
     final user = ref.read(authProvider);
     if (user == null) return;
@@ -174,10 +259,29 @@ class _TransactionHistoryScreenState
       appBar: AppBar(
         title: const Text('Transaction History'),
         actions: [
-          IconButton(
-            icon: Icon(_showFilters ? Icons.filter_list_off : Icons.filter_list),
-            onPressed: () => setState(() => _showFilters = !_showFilters),
-          ),
+          if (_multiSelectMode) ...[
+            IconButton(
+              icon: const Icon(Icons.delete_sweep),
+              onPressed: _selectedIds.isEmpty ? null : _deleteSelected,
+            ),
+            IconButton(
+              icon: const Icon(Icons.close),
+              onPressed: () => setState(() {
+                _multiSelectMode = false;
+                _selectedIds.clear();
+              }),
+            ),
+          ] else ...[
+            IconButton(
+              icon: const Icon(Icons.checklist),
+              onPressed: () => setState(() => _multiSelectMode = true),
+              tooltip: 'Select multiple',
+            ),
+            IconButton(
+              icon: Icon(_showFilters ? Icons.filter_list_off : Icons.filter_list),
+              onPressed: () => setState(() => _showFilters = !_showFilters),
+            ),
+          ],
         ],
       ),
       body: Column(
@@ -252,6 +356,27 @@ class _TransactionHistoryScreenState
                     padding: const EdgeInsets.only(right: 8),
                     child: ActionChip(
                       avatar: Icon(Icons.date_range, size: 18),
+                      label: const Text('Pick Date'),
+                      onPressed: () async {
+                        final date = await showDatePicker(
+                          context: context,
+                          initialDate: DateTime.now(),
+                          firstDate: DateTime(2020),
+                          lastDate: DateTime.now().add(const Duration(days: 1)),
+                        );
+                        if (date != null) {
+                          setState(() {
+                            _startDate = date;
+                            _endDate = date;
+                          });
+                        }
+                      },
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: ActionChip(
+                      avatar: Icon(Icons.date_range, size: 18),
                       label: const Text('Custom'),
                       onPressed: () async {
                         final range = await showDateRangePicker(
@@ -268,6 +393,15 @@ class _TransactionHistoryScreenState
                       },
                     ),
                   ),
+                  if (_startDate != null && _endDate != null && _startDate == _endDate)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: ActionChip(
+                        avatar: Icon(Icons.delete, size: 18, color: Colors.red),
+                        label: const Text('Delete Date', style: TextStyle(color: Colors.red)),
+                        onPressed: () => _deleteTransactionsForDate(_startDate!),
+                      ),
+                    ),
                   if (_startDate != null || _typeFilter != null)
                     ActionChip(
                       avatar: Icon(Icons.clear, size: 18),
@@ -283,6 +417,17 @@ class _TransactionHistoryScreenState
             ),
             const SizedBox(height: 8),
           ],
+          if (_multiSelectMode && _selectedIds.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              child: Text(
+                '${_selectedIds.length} selected',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.primary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
           Expanded(
             child: filtered.isEmpty
                 ? Center(
@@ -323,18 +468,41 @@ class _TransactionHistoryScreenState
                         },
                         child: Card(
                           child: ListTile(
-                            onTap: () => openDetail(txn),
-                            leading: CircleAvatar(
-                              backgroundColor: _typeColor(txn.type).withValues(alpha: 0.2),
-                              child: Text(
-                                _typeLabel(txn.type),
-                                style: TextStyle(
-                                  color: _typeColor(txn.type),
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
+                            onTap: _multiSelectMode
+                                ? () {
+                                    setState(() {
+                                      if (_selectedIds.contains(txn.id)) {
+                                        _selectedIds.remove(txn.id);
+                                      } else {
+                                        _selectedIds.add(txn.id);
+                                      }
+                                    });
+                                  }
+                                : () => openDetail(txn),
+                            leading: _multiSelectMode
+                                ? Checkbox(
+                                    value: _selectedIds.contains(txn.id),
+                                    onChanged: (v) {
+                                      setState(() {
+                                        if (v == true) {
+                                          _selectedIds.add(txn.id);
+                                        } else {
+                                          _selectedIds.remove(txn.id);
+                                        }
+                                      });
+                                    },
+                                  )
+                                : CircleAvatar(
+                                    backgroundColor: _typeColor(txn.type).withValues(alpha: 0.2),
+                                    child: Text(
+                                      _typeLabel(txn.type),
+                                      style: TextStyle(
+                                        color: _typeColor(txn.type),
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
                             title: Text(
                               txn.customerName,
                               style: const TextStyle(fontWeight: FontWeight.w500),
@@ -342,53 +510,55 @@ class _TransactionHistoryScreenState
                             subtitle: Text(
                               '₹${txn.amount.toStringAsFixed(0)} • ${txn.createdAt.displayTime}',
                             ),
-                            trailing: PopupMenuButton<String>(
-                              onSelected: (v) async {
-                                final pinOk = await _requirePin();
-                                if (!pinOk) {
-                                  if (mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text('Incorrect PIN')),
-                                    );
-                                  }
-                                  return;
-                                }
-                                switch (v) {
-                                  case 'edit':
-                                    if (context.mounted) context.push('/edit-transaction/${txn.id}');
-                                  case 'duplicate':
-                                    _duplicateTransaction(txn);
-                                  case 'delete':
-                                    _deleteTransaction(txn);
-                                }
-                              },
-                              itemBuilder: (ctx) => [
-                                const PopupMenuItem(
-                                  value: 'edit',
-                                  child: ListTile(
-                                    leading: Icon(Icons.edit),
-                                    title: Text('Edit'),
-                                    dense: true,
+                            trailing: _multiSelectMode
+                                ? null
+                                : PopupMenuButton<String>(
+                                    onSelected: (v) async {
+                                      final pinOk = await _requirePin();
+                                      if (!pinOk) {
+                                        if (mounted) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            const SnackBar(content: Text('Incorrect PIN')),
+                                          );
+                                        }
+                                        return;
+                                      }
+                                      switch (v) {
+                                        case 'edit':
+                                          if (context.mounted) context.push('/edit-transaction/${txn.id}');
+                                        case 'duplicate':
+                                          _duplicateTransaction(txn);
+                                        case 'delete':
+                                          _deleteTransaction(txn);
+                                      }
+                                    },
+                                    itemBuilder: (ctx) => [
+                                      const PopupMenuItem(
+                                        value: 'edit',
+                                        child: ListTile(
+                                          leading: Icon(Icons.edit),
+                                          title: Text('Edit'),
+                                          dense: true,
+                                        ),
+                                      ),
+                                      const PopupMenuItem(
+                                        value: 'duplicate',
+                                        child: ListTile(
+                                          leading: Icon(Icons.copy),
+                                          title: Text('Duplicate'),
+                                          dense: true,
+                                        ),
+                                      ),
+                                      const PopupMenuItem(
+                                        value: 'delete',
+                                        child: ListTile(
+                                          leading: Icon(Icons.delete, color: Colors.red),
+                                          title: Text('Delete', style: TextStyle(color: Colors.red)),
+                                          dense: true,
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                ),
-                                const PopupMenuItem(
-                                  value: 'duplicate',
-                                  child: ListTile(
-                                    leading: Icon(Icons.copy),
-                                    title: Text('Duplicate'),
-                                    dense: true,
-                                  ),
-                                ),
-                                const PopupMenuItem(
-                                  value: 'delete',
-                                  child: ListTile(
-                                    leading: Icon(Icons.delete, color: Colors.red),
-                                    title: Text('Delete', style: TextStyle(color: Colors.red)),
-                                    dense: true,
-                                  ),
-                                ),
-                              ],
-                            ),
                           ),
                         ),
                       );

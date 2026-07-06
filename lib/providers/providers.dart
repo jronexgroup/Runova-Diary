@@ -62,6 +62,12 @@ class AuthNotifier extends StateNotifier<AppUser?> {
       pin: pin,
     );
     state = user;
+    if (user != null) {
+      final sync = _ref.read(syncServiceProvider);
+      await sync.syncFromFirebase();
+      _ref.read(transactionsProvider.notifier).loadTransactions(user.id);
+      _ref.read(balancesProvider.notifier).loadBalances(user.id);
+    }
     return user != null;
   }
 
@@ -126,6 +132,7 @@ class TransactionsNotifier extends StateNotifier<List<Transaction>> {
     final hive = _ref.read(hiveServiceProvider);
     await hive.saveTransaction(txn);
     state = [...state, txn];
+    _ref.read(syncServiceProvider).pushTransaction(txn);
     await _ref.read(balancesProvider.notifier).recalculateBalance(userId, txn.createdAt.dateKey);
   }
 
@@ -141,7 +148,22 @@ class TransactionsNotifier extends StateNotifier<List<Transaction>> {
     final hive = _ref.read(hiveServiceProvider);
     await hive.deleteTransaction(userId, txnId);
     state = state.where((t) => t.id != txnId).toList();
+    _ref.read(syncServiceProvider).pushDeleteTransaction(userId, txnId);
     await _ref.read(balancesProvider.notifier).recalculateDayBalances(userId, dateKey);
+  }
+
+  Future<int> deleteTransactionsForDate(String userId, String dateKey) async {
+    final hive = _ref.read(hiveServiceProvider);
+    final count = await hive.deleteTransactionsForDate(userId, dateKey);
+    state = state.where((t) => t.createdAt.dateKey != dateKey).toList();
+    final sync = _ref.read(syncServiceProvider);
+    for (final txn in state) {
+      if (txn.createdAt.dateKey == dateKey) {
+        await sync.pushDeleteTransaction(userId, txn.id);
+      }
+    }
+    await _ref.read(balancesProvider.notifier).recalculateDayBalances(userId, dateKey);
+    return count;
   }
 
   List<Transaction> searchTransactions(String query) {
@@ -209,6 +231,7 @@ class BalancesNotifier extends StateNotifier<Map<String, DailyBalance>> {
       runaLailaOpeningBalance: yesterday?.runaLailaClosingBalance ?? runaLailaOpening,
     );
     await hive.saveBalance(balance);
+    _ref.read(syncServiceProvider).pushBalance(balance);
     state = {...state, dateKey: balance};
     return balance;
   }
@@ -230,6 +253,7 @@ class BalancesNotifier extends StateNotifier<Map<String, DailyBalance>> {
       runaLailaOpeningBalance: runaLailaOpening ?? balance.runaLailaOpeningBalance,
     );
     await hive.saveBalance(updated);
+    _ref.read(syncServiceProvider).pushBalance(updated);
     state = {...state, dateKey: updated};
   }
 
@@ -271,6 +295,7 @@ class BalancesNotifier extends StateNotifier<Map<String, DailyBalance>> {
       runaLailaClosingBalance: runaLailaClosing,
     );
     await hive.saveBalance(updated);
+    _ref.read(syncServiceProvider).pushBalance(updated);
     state = {...state, dateKey: updated};
   }
 
