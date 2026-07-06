@@ -88,6 +88,7 @@ class _TransactionHistoryScreenState
       balanceAfterTransaction: balance,
       userId: user.id,
       mobileNumber: txn.mobileNumber,
+      aadhaarNumber: txn.aadhaarNumber,
       transactionId: txn.transactionId,
       notes: txn.notes,
       bankName: txn.bankName,
@@ -124,6 +125,8 @@ class _TransactionHistoryScreenState
     final theme = Theme.of(context);
     final allTransactions = ref.watch(transactionsProvider);
     final filtered = _filteredTransactions(allTransactions);
+
+    void openDetail(Transaction t) => context.push('/transaction-detail/${t.id}');
 
     return Scaffold(
       appBar: AppBar(
@@ -267,6 +270,7 @@ class _TransactionHistoryScreenState
                         onDismissed: (_) => _deleteTransaction(txn),
                         child: Card(
                           child: ListTile(
+                            onTap: () => openDetail(txn),
                             leading: CircleAvatar(
                               backgroundColor: _typeColor(txn.type).withValues(alpha: 0.2),
                               child: Text(

@@ -19,6 +19,7 @@ class _EditTransactionScreenState extends ConsumerState<EditTransactionScreen> {
   final _formKey = GlobalKey<FormState>();
   final _customerNameController = TextEditingController();
   final _amountController = TextEditingController();
+  final _aadhaarController = TextEditingController();
   final _mobileController = TextEditingController();
   final _txnIdController = TextEditingController();
   final _notesController = TextEditingController();
@@ -44,6 +45,7 @@ class _EditTransactionScreenState extends ConsumerState<EditTransactionScreen> {
     _original = txn;
     _customerNameController.text = txn.customerName;
     _amountController.text = txn.amount.toStringAsFixed(0);
+    _aadhaarController.text = txn.aadhaarNumber ?? '';
     _mobileController.text = txn.mobileNumber ?? '';
     _txnIdController.text = txn.transactionId ?? '';
     _notesController.text = txn.notes ?? '';
@@ -57,6 +59,7 @@ class _EditTransactionScreenState extends ConsumerState<EditTransactionScreen> {
   void dispose() {
     _customerNameController.dispose();
     _amountController.dispose();
+    _aadhaarController.dispose();
     _mobileController.dispose();
     _txnIdController.dispose();
     _notesController.dispose();
@@ -85,6 +88,9 @@ class _EditTransactionScreenState extends ConsumerState<EditTransactionScreen> {
       mobileNumber: _mobileController.text.trim().isEmpty
           ? null
           : _mobileController.text.trim(),
+      aadhaarNumber: _aadhaarController.text.trim().isEmpty
+          ? null
+          : _aadhaarController.text.trim(),
       transactionId: _txnIdController.text.trim().isEmpty
           ? null
           : _txnIdController.text.trim(),
@@ -124,8 +130,10 @@ class _EditTransactionScreenState extends ConsumerState<EditTransactionScreen> {
       );
     }
 
+    final theme = Theme.of(context);
     final isPhonePe = _original!.type == TransactionType.cashIn ||
         _original!.type == TransactionType.cashOut;
+    final isAEPS = _original!.type == TransactionType.aeps;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Edit Transaction')),
@@ -148,33 +156,48 @@ class _EditTransactionScreenState extends ConsumerState<EditTransactionScreen> {
               ),
               const SizedBox(height: 16),
               if (isPhonePe) ...[
-                DropdownButtonFormField<PhonePeAccount>(
-                  value: _selectedAccount,
-                  decoration: const InputDecoration(
-                    labelText: 'PhonePe Account *',
-                    prefixIcon: Icon(Icons.phone_android),
-                  ),
-                  items: PhonePeAccount.values.map((a) {
-                    return DropdownMenuItem(
-                      value: a,
-                      child: Text(a.displayName),
-                    );
-                  }).toList(),
-                  onChanged: (v) => setState(() => _selectedAccount = v),
-                  validator: (v) => v == null ? 'Select an account' : null,
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _bankNameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Bank Name *',
-                    prefixIcon: Icon(Icons.account_balance),
-                  ),
-                  validator: (v) =>
-                      v?.trim().isEmpty ?? true ? 'Bank name required' : null,
+                Text('PhonePe Account *', style: theme.textTheme.labelLarge),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _accountToggle(PhonePeAccount.hasibul),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _accountToggle(PhonePeAccount.runaLaila),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 16),
               ],
+              if (isAEPS) ...[
+                TextFormField(
+                  controller: _aadhaarController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Aadhaar Number *',
+                    prefixIcon: Icon(Icons.credit_card),
+                  ),
+                  validator: (v) {
+                    if (v?.trim().isEmpty ?? true) return 'Aadhaar number required';
+                    if (v!.trim().length < 12) return 'Aadhaar must be 12 digits';
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+              ],
+              TextFormField(
+                controller: _bankNameController,
+                decoration: const InputDecoration(
+                  labelText: 'Bank Name *',
+                  prefixIcon: Icon(Icons.account_balance),
+                ),
+                textCapitalization: TextCapitalization.words,
+                validator: (v) =>
+                    v?.trim().isEmpty ?? true ? 'Bank name required' : null,
+              ),
+              const SizedBox(height: 16),
               TextFormField(
                 controller: _amountController,
                 keyboardType: TextInputType.number,
@@ -215,7 +238,7 @@ class _EditTransactionScreenState extends ConsumerState<EditTransactionScreen> {
                   prefixIcon: Icon(Icons.notes),
                 ),
               ),
-              if (_original!.type == TransactionType.aeps) ...[
+              if (isAEPS) ...[
                 const SizedBox(height: 16),
                 CheckboxListTile(
                   title: const Text('Override Commission'),
@@ -246,6 +269,51 @@ class _EditTransactionScreenState extends ConsumerState<EditTransactionScreen> {
               const SizedBox(height: 16),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _accountToggle(PhonePeAccount account) {
+    final selected = _selectedAccount == account;
+    return GestureDetector(
+      onTap: () => setState(() => _selectedAccount = account),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+        decoration: BoxDecoration(
+          color: selected
+              ? Theme.of(context).colorScheme.primaryContainer
+              : Theme.of(context).colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: selected
+                ? Theme.of(context).colorScheme.primary
+                : Colors.transparent,
+            width: 2,
+          ),
+        ),
+        child: Column(
+          children: [
+            Icon(
+              Icons.phone_android,
+              color: selected
+                  ? Theme.of(context).colorScheme.primary
+                  : Theme.of(context).colorScheme.onSurfaceVariant,
+              size: 28,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              account.displayName,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+                color: selected
+                    ? Theme.of(context).colorScheme.primary
+                    : null,
+              ),
+            ),
+          ],
         ),
       ),
     );

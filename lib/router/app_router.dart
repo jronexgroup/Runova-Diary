@@ -11,6 +11,7 @@ import '../screens/transaction_history_screen.dart';
 import '../screens/edit_transaction_screen.dart';
 import '../screens/reports_screen.dart';
 import '../screens/settings_screen.dart';
+import '../screens/transaction_detail_screen.dart';
 import '../utils/constants.dart';
 
 final _navigatorKey = GlobalKey<NavigatorState>();
@@ -74,6 +75,13 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, state) {
           final id = state.pathParameters['id'] ?? '';
           return EditTransactionScreen(transactionId: id);
+        },
+      ),
+      GoRoute(
+        path: '/transaction-detail/:id',
+        builder: (_, state) {
+          final id = state.pathParameters['id'] ?? '';
+          return TransactionDetailScreen(transactionId: id);
         },
       ),
       GoRoute(

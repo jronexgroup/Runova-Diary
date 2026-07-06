@@ -13,6 +13,7 @@ class Transaction {
   final double commission;
   final bool commissionOverridden;
   final String? mobileNumber;
+  final String? aadhaarNumber;
   final String? transactionId;
   final String? notes;
   final String? bankName;
@@ -32,6 +33,7 @@ class Transaction {
     required this.userId,
     this.commissionOverridden = false,
     this.mobileNumber,
+    this.aadhaarNumber,
     this.transactionId,
     this.notes,
     this.bankName,
@@ -46,6 +48,7 @@ class Transaction {
     double? commission,
     bool? commissionOverridden,
     String? mobileNumber,
+    String? aadhaarNumber,
     String? transactionId,
     String? notes,
     String? bankName,
@@ -62,6 +65,7 @@ class Transaction {
       commission: commission ?? this.commission,
       commissionOverridden: commissionOverridden ?? this.commissionOverridden,
       mobileNumber: mobileNumber ?? this.mobileNumber,
+      aadhaarNumber: aadhaarNumber ?? this.aadhaarNumber,
       transactionId: transactionId ?? this.transactionId,
       notes: notes ?? this.notes,
       bankName: bankName ?? this.bankName,
@@ -80,6 +84,7 @@ class Transaction {
     'commission': commission,
     'commissionOverridden': commissionOverridden,
     'mobileNumber': mobileNumber,
+    'aadhaarNumber': aadhaarNumber,
     'transactionId': transactionId,
     'notes': notes,
     'bankName': bankName,
@@ -98,6 +103,7 @@ class Transaction {
       commission: (json['commission'] as num).toDouble(),
       commissionOverridden: json['commissionOverridden'] as bool? ?? false,
       mobileNumber: json['mobileNumber'] as String?,
+      aadhaarNumber: json['aadhaarNumber'] as String?,
       transactionId: json['transactionId'] as String?,
       notes: json['notes'] as String?,
       bankName: json['bankName'] as String?,
@@ -117,6 +123,7 @@ class Transaction {
     required double balanceAfterTransaction,
     required String userId,
     String? mobileNumber,
+    String? aadhaarNumber,
     String? transactionId,
     String? notes,
     String? bankName,
@@ -137,6 +144,7 @@ class Transaction {
       createdAt: now,
       userId: userId,
       mobileNumber: mobileNumber,
+      aadhaarNumber: aadhaarNumber,
       transactionId: transactionId,
       notes: notes,
       bankName: bankName,
