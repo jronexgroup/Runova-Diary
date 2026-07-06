@@ -318,16 +318,16 @@ class _NewTransactionScreenState extends ConsumerState<NewTransactionScreen> {
               const SizedBox(height: 16),
               if (isAEPS) ...[
                 SignaturePad(notifier: _signatureNotifier),
-              ] else ...[
-                TextFormField(
-                  controller: _mobileController,
-                  keyboardType: TextInputType.phone,
-                  decoration: const InputDecoration(
-                    labelText: 'Mobile Number (optional)',
-                    prefixIcon: Icon(Icons.phone),
-                  ),
-                ),
+                const SizedBox(height: 16),
               ],
+              TextFormField(
+                controller: _mobileController,
+                keyboardType: TextInputType.phone,
+                decoration: const InputDecoration(
+                  labelText: 'Mobile Number (optional)',
+                  prefixIcon: Icon(Icons.phone),
+                ),
+              ),
               const SizedBox(height: 16),
               TextFormField(
                 controller: _txnIdController,
