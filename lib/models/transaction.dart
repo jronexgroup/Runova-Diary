@@ -163,7 +163,7 @@ class Transaction {
   static double _calculateCommission(double amount, TransactionType type) {
     if (type != TransactionType.aeps) return 0;
     final base = (amount / 1000).ceil() * 10.0;
-    final extra = (amount / 10000).ceil() * 13.0;
+    final extra = amount * 13.0 / 10000.0;
     return base + extra;
   }
 }

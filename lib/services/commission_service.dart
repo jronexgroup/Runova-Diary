@@ -6,7 +6,7 @@ class CommissionService {
     switch (type) {
       case TransactionType.aeps:
         final base = (amount / 1000).ceil() * 10.0;
-        final extra = (amount / 10000).ceil() * 13.0;
+        final extra = amount * 13.0 / 10000.0;
         return base + extra;
       case TransactionType.cashIn:
       case TransactionType.cashOut:
