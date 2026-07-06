@@ -107,6 +107,13 @@ class TransactionDetailScreen extends ConsumerWidget {
                 Icon(Icons.edit, size: 18, color: theme.colorScheme.primary),
                 const SizedBox(width: 6),
                 Text('Signature', style: theme.textTheme.labelLarge),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.fullscreen, size: 20),
+                  tooltip: 'View full screen',
+                  visualDensity: VisualDensity.compact,
+                  onPressed: () => _openFullSignature(context, signatureData),
+                ),
               ],
             ),
             const SizedBox(height: 8),
@@ -121,6 +128,53 @@ class TransactionDetailScreen extends ConsumerWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  void _openFullSignature(BuildContext context, String signatureData) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => Scaffold(
+          backgroundColor: Colors.white,
+          appBar: AppBar(
+            backgroundColor: Colors.white,
+            surfaceTintColor: Colors.white,
+            title: const Text('Signature'),
+            centerTitle: true,
+            leading: IconButton(
+              icon: const Icon(Icons.close),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+          ),
+          body: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  Expanded(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey.shade400),
+                        borderRadius: BorderRadius.circular(12),
+                        color: Colors.grey.shade50,
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: LayoutBuilder(
+                          builder: (_, constraints) => CustomPaint(
+                            painter: _SignatureDisplayPainter(signatureData),
+                            size: Size(constraints.maxWidth, constraints.maxHeight),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
       ),
     );
