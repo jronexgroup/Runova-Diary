@@ -28,6 +28,48 @@ class _TransactionHistoryScreenState
     super.dispose();
   }
 
+  Future<bool> _requirePin() async {
+    final pinCtrl = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Enter PIN'),
+        content: Form(
+          key: formKey,
+          child: TextFormField(
+            controller: pinCtrl,
+            obscureText: true,
+            keyboardType: TextInputType.number,
+            maxLength: 6,
+            decoration: const InputDecoration(
+              labelText: 'PIN',
+              counterText: '',
+            ),
+            validator: (v) =>
+                v?.isEmpty ?? true ? 'Enter your PIN' : null,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              if (!formKey.currentState!.validate()) return;
+              Navigator.pop(ctx, true);
+            },
+            child: const Text('Confirm'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || pinCtrl.text.isEmpty) return false;
+    return ref.read(authServiceProvider).verifyPin(pinCtrl.text);
+  }
+
   List<Transaction> _filteredTransactions(List<Transaction> all) {
     var filtered = all;
 
@@ -267,7 +309,18 @@ class _TransactionHistoryScreenState
                           padding: const EdgeInsets.only(right: 16),
                           child: const Icon(Icons.delete, color: Colors.white),
                         ),
-                        onDismissed: (_) => _deleteTransaction(txn),
+                        onDismissed: (_) async {
+                          final pinOk = await _requirePin();
+                          if (!pinOk) {
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Incorrect PIN')),
+                              );
+                            }
+                            return;
+                          }
+                          _deleteTransaction(txn);
+                        },
                         child: Card(
                           child: ListTile(
                             onTap: () => openDetail(txn),
@@ -290,10 +343,19 @@ class _TransactionHistoryScreenState
                               '₹${txn.amount.toStringAsFixed(0)} • ${txn.createdAt.displayTime}',
                             ),
                             trailing: PopupMenuButton<String>(
-                              onSelected: (v) {
+                              onSelected: (v) async {
+                                final pinOk = await _requirePin();
+                                if (!pinOk) {
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('Incorrect PIN')),
+                                    );
+                                  }
+                                  return;
+                                }
                                 switch (v) {
                                   case 'edit':
-                                    context.push('/edit-transaction/${txn.id}');
+                                    if (context.mounted) context.push('/edit-transaction/${txn.id}');
                                   case 'duplicate':
                                     _duplicateTransaction(txn);
                                   case 'delete':

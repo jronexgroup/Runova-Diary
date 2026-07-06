@@ -117,10 +117,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
                 const Divider(height: 1),
                 ListTile(
-                  leading: const Icon(Icons.edit),
-                  title: const Text('Edit Opening Balance'),
+                  leading: const Icon(Icons.add_circle),
+                  title: const Text('Add Balance'),
                   trailing: const Icon(Icons.chevron_right),
-                  onTap: () => _showEditOpeningBalance(),
+                  onTap: () => _showAddBalance(),
                 ),
               ],
             ),
@@ -248,7 +248,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  void _showEditOpeningBalance() {
+  void _showAddBalance() {
     final user = ref.read(authProvider);
     if (user == null) return;
 
@@ -256,80 +256,165 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final balance = ref.read(balancesProvider)[todayKey];
     if (balance == null) return;
 
-    final aepsCtrl = TextEditingController(
-      text: balance.aepsOpeningBalance.toStringAsFixed(0),
-    );
-    final hasibulCtrl = TextEditingController(
-      text: balance.hasibulOpeningBalance.toStringAsFixed(0),
-    );
-    final runaCtrl = TextEditingController(
-      text: balance.runaLailaOpeningBalance.toStringAsFixed(0),
-    );
+    String? selectedAccount;
+    final amountCtrl = TextEditingController();
+    final notesCtrl = TextEditingController();
     final formKey = GlobalKey<FormState>();
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Edit Opening Balance'),
-        content: Form(
-          key: formKey,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Text('Add Balance'),
+          content: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('Select Account', style: Theme.of(ctx).textTheme.labelLarge),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    _accountBtn(ctx, 'AEPS', Icons.account_balance,
+                        selectedAccount == 'aeps', () {
+                      setDialogState(() => selectedAccount = 'aeps');
+                    }),
+                    const SizedBox(width: 8),
+                    _accountBtn(ctx, 'Hasibul', Icons.phone_android,
+                        selectedAccount == 'hasibul', () {
+                      setDialogState(() => selectedAccount = 'hasibul');
+                    }),
+                    const SizedBox(width: 8),
+                    _accountBtn(ctx, 'Runa Laila', Icons.phone_android,
+                        selectedAccount == 'runaLaila', () {
+                      setDialogState(() => selectedAccount = 'runaLaila');
+                    }),
+                  ],
+                ),
+                if (selectedAccount == null) ...[
+                  const SizedBox(height: 4),
+                  Text('Please select an account',
+                      style: TextStyle(color: Theme.of(ctx).colorScheme.error, fontSize: 12)),
+                ],
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: amountCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Amount *',
+                    prefixIcon: Icon(Icons.currency_rupee),
+                  ),
+                  validator: (v) {
+                    if (v?.trim().isEmpty ?? true) return 'Amount required';
+                    final amt = double.tryParse(v!);
+                    if (amt == null || amt <= 0) return 'Enter a valid amount';
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: notesCtrl,
+                  maxLines: 2,
+                  decoration: const InputDecoration(
+                    labelText: 'Notes (optional)',
+                    prefixIcon: Icon(Icons.notes),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () async {
+                if (selectedAccount == null) {
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    const SnackBar(content: Text('Please select an account')),
+                  );
+                  return;
+                }
+                if (!formKey.currentState!.validate()) return;
+
+                final amount = double.parse(amountCtrl.text.trim());
+                double aepsOpening = balance.aepsOpeningBalance;
+                double hasibulOpening = balance.hasibulOpeningBalance;
+                double runaLailaOpening = balance.runaLailaOpeningBalance;
+
+                switch (selectedAccount) {
+                  case 'aeps':
+                    aepsOpening += amount;
+                  case 'hasibul':
+                    hasibulOpening += amount;
+                  case 'runaLaila':
+                    runaLailaOpening += amount;
+                }
+
+                await ref.read(balancesProvider.notifier).updateOpeningBalances(
+                  userId: user.id,
+                  dateKey: todayKey,
+                  aepsOpening: aepsOpening,
+                  hasibulOpening: hasibulOpening,
+                  runaLailaOpening: runaLailaOpening,
+                );
+
+                if (ctx.mounted) {
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Balance added successfully')),
+                  );
+                }
+              },
+              child: const Text('Add'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _accountBtn(BuildContext ctx, String label, IconData icon,
+      bool selected, VoidCallback onTap) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+          decoration: BoxDecoration(
+            color: selected
+                ? Theme.of(ctx).colorScheme.primaryContainer
+                : Theme.of(ctx).colorScheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: selected
+                  ? Theme.of(ctx).colorScheme.primary
+                  : Colors.transparent,
+              width: 2,
+            ),
+          ),
           child: Column(
-            mainAxisSize: MainAxisSize.min,
             children: [
-              TextFormField(
-                controller: aepsCtrl,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'AEPS Opening Balance',
-                  prefixIcon: Icon(Icons.account_balance),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: hasibulCtrl,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Hasibul PhonePe Opening',
-                  prefixIcon: Icon(Icons.phone_android),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: runaCtrl,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Runa Laila PhonePe Opening',
-                  prefixIcon: Icon(Icons.phone_android),
-                ),
-              ),
+              Icon(icon,
+                  color: selected
+                      ? Theme.of(ctx).colorScheme.primary
+                      : Theme.of(ctx).colorScheme.onSurfaceVariant,
+                  size: 24),
+              const SizedBox(height: 4),
+              Text(label,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+                    color: selected
+                        ? Theme.of(ctx).colorScheme.primary
+                        : null,
+                  )),
             ],
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () async {
-              if (!formKey.currentState!.validate()) return;
-              await ref.read(balancesProvider.notifier).updateOpeningBalances(
-                userId: user.id,
-                dateKey: todayKey,
-                aepsOpening: double.tryParse(aepsCtrl.text),
-                hasibulOpening: double.tryParse(hasibulCtrl.text),
-                runaLailaOpening: double.tryParse(runaCtrl.text),
-              );
-              if (ctx.mounted) {
-                Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Opening balance updated')),
-                );
-              }
-            },
-            child: const Text('Save'),
-          ),
-        ],
       ),
     );
   }

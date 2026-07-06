@@ -72,6 +72,12 @@ class AuthService {
     return _hiveService.getUser();
   }
 
+  bool verifyPin(String pin) {
+    final user = _hiveService.getUser();
+    if (user == null) return false;
+    return user.pinHash == _hashPin(pin);
+  }
+
   Future<void> changePin(String oldPin, String newPin) async {
     final user = _hiveService.getUser();
     if (user == null) throw Exception('No user logged in');
