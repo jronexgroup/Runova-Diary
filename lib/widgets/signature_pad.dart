@@ -60,24 +60,6 @@ class _SignaturePadState extends State<SignaturePad> {
 
   bool get isEmpty => _strokes.isEmpty && _currentStroke.isEmpty;
 
-  void _openFullscreen() {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => _FullScreenSignature(
-          strokes: _strokes.map((s) => List<Offset>.from(s)).toList(),
-        ),
-      ),
-    ).then((result) {
-      if (result != null && result is List<List<Offset>>) {
-        setState(() {
-          _strokes.clear();
-          _strokes.addAll(result);
-        });
-        _save();
-      }
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -90,12 +72,6 @@ class _SignaturePadState extends State<SignaturePad> {
             const SizedBox(width: 6),
             Text('Signature', style: theme.textTheme.labelLarge),
             const Spacer(),
-            IconButton(
-              icon: Icon(Icons.fullscreen, size: 20),
-              onPressed: _openFullscreen,
-              tooltip: 'Full screen',
-              visualDensity: VisualDensity.compact,
-            ),
             if (!isEmpty)
               TextButton.icon(
                 onPressed: clear,
@@ -114,157 +90,32 @@ class _SignaturePadState extends State<SignaturePad> {
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(12),
-            child: _SignatureCanvas(
-              strokes: _strokes,
-              currentStroke: _currentStroke,
-              onPanStart: (pos) {
-                setState(() => _currentStroke = [pos]);
+            child: GestureDetector(
+              onPanStart: (details) {
+                setState(() {
+                  _currentStroke = [details.localPosition];
+                });
               },
-              onPanUpdate: (pos) {
-                setState(() => _currentStroke.add(pos));
+              onPanUpdate: (details) {
+                setState(() {
+                  _currentStroke.add(details.localPosition);
+                });
               },
-              onPanEnd: () {
+              onPanEnd: (_) {
                 setState(() {
                   _strokes.add(List.from(_currentStroke));
                   _currentStroke = [];
                 });
                 _save();
               },
+              child: CustomPaint(
+                painter: _SignaturePainter(_strokes, _currentStroke),
+                size: const Size(double.infinity, 160),
+              ),
             ),
           ),
         ),
       ],
-    );
-  }
-}
-
-class _SignatureCanvas extends StatelessWidget {
-  final List<List<Offset>> strokes;
-  final List<Offset> currentStroke;
-  final void Function(Offset) onPanStart;
-  final void Function(Offset) onPanUpdate;
-  final VoidCallback onPanEnd;
-
-  const _SignatureCanvas({
-    required this.strokes,
-    required this.currentStroke,
-    required this.onPanStart,
-    required this.onPanUpdate,
-    required this.onPanEnd,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onPanStart: (d) => onPanStart(d.localPosition),
-      onPanUpdate: (d) => onPanUpdate(d.localPosition),
-      onPanEnd: (_) => onPanEnd(),
-      child: LayoutBuilder(
-        builder: (_, constraints) => CustomPaint(
-          painter: _SignaturePainter(strokes, currentStroke),
-          size: Size(constraints.maxWidth, constraints.maxHeight),
-        ),
-      ),
-    );
-  }
-}
-
-class _FullScreenSignature extends StatefulWidget {
-  final List<List<Offset>> strokes;
-
-  const _FullScreenSignature({required this.strokes});
-
-  @override
-  State<_FullScreenSignature> createState() => _FullScreenSignatureState();
-}
-
-class _FullScreenSignatureState extends State<_FullScreenSignature> {
-  late List<List<Offset>> _strokes;
-  List<Offset> _currentStroke = [];
-
-  @override
-  void initState() {
-    super.initState();
-    _strokes = widget.strokes.map((s) => List<Offset>.from(s)).toList();
-  }
-
-  void _saveAndClose() {
-    Navigator.of(context).pop(_strokes);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
-        title: const Text('Sign here'),
-        centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.close),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        actions: [
-          if (_strokes.isNotEmpty || _currentStroke.isNotEmpty)
-            IconButton(
-              icon: const Icon(Icons.clear),
-              onPressed: () => setState(() {
-                _strokes.clear();
-                _currentStroke.clear();
-              }),
-            ),
-          TextButton.icon(
-            onPressed: _strokes.isEmpty ? null : _saveAndClose,
-            icon: const Icon(Icons.check),
-            label: const Text('Done'),
-          ),
-        ],
-      ),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              Text(
-                'Sign with your finger',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Colors.grey,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Expanded(
-                child: Container(
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey.shade400),
-                    borderRadius: BorderRadius.circular(12),
-                    color: Colors.grey.shade50,
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: _SignatureCanvas(
-                      strokes: _strokes,
-                      currentStroke: _currentStroke,
-                      onPanStart: (pos) {
-                        setState(() => _currentStroke = [pos]);
-                      },
-                      onPanUpdate: (pos) {
-                        setState(() => _currentStroke.add(pos));
-                      },
-                      onPanEnd: () {
-                        setState(() {
-                          _strokes.add(List.from(_currentStroke));
-                          _currentStroke = [];
-                        });
-                      },
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }

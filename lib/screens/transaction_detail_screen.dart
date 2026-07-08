@@ -28,6 +28,8 @@ class TransactionDetailScreen extends ConsumerWidget {
       TransactionType.aeps => Colors.blue,
       TransactionType.cashIn => Colors.green,
       TransactionType.cashOut => Colors.orange,
+      TransactionType.balanceAdjustment => Colors.purple,
+      TransactionType.selfTransfer => Colors.indigo,
     };
 
     return Scaffold(
@@ -72,7 +74,7 @@ class TransactionDetailScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 16),
           _detailTile(theme, 'Customer Name', txn.customerName, Icons.person),
-          _detailTile(theme, 'Amount', '₹${txn.amount.toStringAsFixed(2)}', Icons.currency_rupee),
+          _detailTile(theme, 'Amount', '₹${txn.amount.toStringAsFixed(0)}', Icons.currency_rupee),
           if (txn.bankName != null)
             _detailTile(theme, 'Bank Name', txn.bankName!, Icons.account_balance),
           if (txn.aadhaarNumber != null)
@@ -83,8 +85,15 @@ class TransactionDetailScreen extends ConsumerWidget {
             _detailTile(theme, 'Transaction ID', txn.transactionId!, Icons.receipt),
           if (txn.phonePeAccount != null)
             _detailTile(theme, 'PhonePe Account', txn.phonePeAccount!.displayName, Icons.phone_android),
+          if (txn.account != null) ...[
+            _detailTile(theme, 'Account', _accountLabel(txn.account!), Icons.account_balance),
+          ],
+          if (txn.fromAccount != null && txn.toAccount != null) ...[
+            _detailTile(theme, 'From', _accountLabel(txn.fromAccount!), Icons.arrow_forward),
+            _detailTile(theme, 'To', _accountLabel(txn.toAccount!), Icons.arrow_back),
+          ],
           _detailTile(theme, 'Balance After', '₹${txn.balanceAfterTransaction.toStringAsFixed(2)}', Icons.account_balance_wallet),
-          _detailTile(theme, 'Commission', '₹${txn.commission.toStringAsFixed(2)}', Icons.monetization_on),
+          _detailTile(theme, 'Commission', '₹${txn.commission.toStringAsFixed(0)}', Icons.monetization_on),
           _detailTile(theme, 'Date & Time', txn.createdAt.displayDateTime, Icons.schedule),
           if (txn.notes != null && txn.notes!.isNotEmpty)
             _detailTile(theme, 'Notes', txn.notes!, Icons.notes),
@@ -107,13 +116,6 @@ class TransactionDetailScreen extends ConsumerWidget {
                 Icon(Icons.edit, size: 18, color: theme.colorScheme.primary),
                 const SizedBox(width: 6),
                 Text('Signature', style: theme.textTheme.labelLarge),
-                const Spacer(),
-                IconButton(
-                  icon: const Icon(Icons.fullscreen, size: 20),
-                  tooltip: 'View full screen',
-                  visualDensity: VisualDensity.compact,
-                  onPressed: () => _openFullSignature(context, signatureData),
-                ),
               ],
             ),
             const SizedBox(height: 8),
@@ -133,51 +135,13 @@ class TransactionDetailScreen extends ConsumerWidget {
     );
   }
 
-  void _openFullSignature(BuildContext context, String signatureData) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => Scaffold(
-          backgroundColor: Colors.white,
-          appBar: AppBar(
-            backgroundColor: Colors.white,
-            surfaceTintColor: Colors.white,
-            title: const Text('Signature'),
-            centerTitle: true,
-            leading: IconButton(
-              icon: const Icon(Icons.close),
-              onPressed: () => Navigator.of(context).pop(),
-            ),
-          ),
-          body: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  Expanded(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey.shade400),
-                        borderRadius: BorderRadius.circular(12),
-                        color: Colors.grey.shade50,
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: LayoutBuilder(
-                          builder: (_, constraints) => CustomPaint(
-                            painter: _SignatureDisplayPainter(signatureData),
-                            size: Size(constraints.maxWidth, constraints.maxHeight),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
+  String _accountLabel(String acct) {
+    switch (acct) {
+      case 'aeps': return 'AEPS';
+      case 'hasibul': return 'Hasibul PhonePe';
+      case 'runaLaila': return 'Runa Laila PhonePe';
+      default: return acct;
+    }
   }
 
   Widget _detailTile(ThemeData theme, String label, String value, IconData icon) {

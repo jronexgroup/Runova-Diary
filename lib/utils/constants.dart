@@ -19,7 +19,9 @@ class AppConstants {
 enum TransactionType {
   aeps,
   cashIn,
-  cashOut;
+  cashOut,
+  balanceAdjustment,
+  selfTransfer;
 
   String get displayName {
     switch (this) {
@@ -29,6 +31,10 @@ enum TransactionType {
         return 'Cash In';
       case TransactionType.cashOut:
         return 'Cash Out';
+      case TransactionType.balanceAdjustment:
+        return 'Balance Adjustment';
+      case TransactionType.selfTransfer:
+        return 'Self Transfer';
     }
   }
 }

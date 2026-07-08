@@ -146,6 +146,10 @@ class _NewTransactionScreenState extends ConsumerState<NewTransactionScreen> {
         return 'Cash In';
       case TransactionType.cashOut:
         return 'Cash Out';
+      case TransactionType.balanceAdjustment:
+        return 'Balance Adjustment';
+      case TransactionType.selfTransfer:
+        return 'Self Transfer';
     }
   }
 
@@ -203,7 +207,7 @@ class _NewTransactionScreenState extends ConsumerState<NewTransactionScreen> {
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            'Detected: ₹${(_calculatedCommission!).toStringAsFixed(2)} commission included',
+                            'Detected: ₹${(_calculatedCommission!).toStringAsFixed(0)} commission included',
                             style: theme.textTheme.bodyMedium?.copyWith(
                               color: theme.colorScheme.onPrimaryContainer,
                               fontWeight: FontWeight.w500,
@@ -299,7 +303,7 @@ class _NewTransactionScreenState extends ConsumerState<NewTransactionScreen> {
                       style: theme.textTheme.bodyMedium,
                     ),
                     trailing: Text(
-                      '₹${projectedBalance.toStringAsFixed(2)}',
+                      '₹${projectedBalance.toStringAsFixed(0)}',
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                         color: insufficient ? Colors.red : null,
@@ -357,7 +361,7 @@ class _NewTransactionScreenState extends ConsumerState<NewTransactionScreen> {
                         child: Text(
                           _autoCommission
                               ? (_calculatedCommission != null
-                                  ? 'Commission: ₹${_calculatedCommission!.toStringAsFixed(2)}'
+                                  ? 'Commission: ₹${_calculatedCommission!.toStringAsFixed(0)}'
                                   : 'Auto Commission ON')
                               : 'Auto Commission OFF',
                           style: theme.textTheme.bodyLarge,

@@ -22,6 +22,9 @@ class Transaction {
   final DateTime createdAt;
   final String userId;
   final String? signatureData;
+  final String? account;
+  final String? fromAccount;
+  final String? toAccount;
 
   const Transaction({
     required this.id,
@@ -40,6 +43,9 @@ class Transaction {
     this.bankName,
     this.phonePeAccount,
     this.signatureData,
+    this.account,
+    this.fromAccount,
+    this.toAccount,
   });
 
   Transaction copyWith({
@@ -59,6 +65,9 @@ class Transaction {
     DateTime? createdAt,
     String? userId,
     String? signatureData,
+    String? account,
+    String? fromAccount,
+    String? toAccount,
   }) {
     return Transaction(
       id: id ?? this.id,
@@ -77,6 +86,9 @@ class Transaction {
       createdAt: createdAt ?? this.createdAt,
       userId: userId ?? this.userId,
       signatureData: signatureData ?? this.signatureData,
+      account: account ?? this.account,
+      fromAccount: fromAccount ?? this.fromAccount,
+      toAccount: toAccount ?? this.toAccount,
     );
   }
 
@@ -97,6 +109,9 @@ class Transaction {
     'createdAt': createdAt.toIso8601String(),
     'userId': userId,
     'signatureData': signatureData,
+    'account': account,
+    'fromAccount': fromAccount,
+    'toAccount': toAccount,
   };
 
   factory Transaction.fromJson(Map<String, dynamic> json, {String? idOverride}) {
@@ -119,6 +134,9 @@ class Transaction {
       createdAt: DateTime.parse(json['createdAt'] as String),
       userId: json['userId'] as String,
       signatureData: json['signatureData'] as String?,
+      account: json['account'] as String?,
+      fromAccount: json['fromAccount'] as String?,
+      toAccount: json['toAccount'] as String?,
     );
   }
 
@@ -137,6 +155,9 @@ class Transaction {
     double? commission,
     bool commissionOverridden = false,
     String? signatureData,
+    String? account,
+    String? fromAccount,
+    String? toAccount,
   }) {
     final now = DateTime.now();
     final commissionValue = commission ?? _calculateCommission(amount, type);
@@ -157,6 +178,9 @@ class Transaction {
       bankName: bankName,
       phonePeAccount: phonePeAccount,
       signatureData: signatureData,
+      account: account,
+      fromAccount: fromAccount,
+      toAccount: toAccount,
     );
   }
 

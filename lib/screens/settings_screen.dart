@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../providers/providers.dart';
 import '../utils/constants.dart';
-import '../utils/date_utils.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -128,6 +127,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   title: const Text('Decrease Balance', style: TextStyle(color: Colors.red)),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => _showAdjustBalance(false),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.swap_horiz, color: Colors.indigo),
+                  title: const Text('Self Transfer'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => _showSelfTransfer(),
                 ),
               ],
             ),
@@ -259,10 +265,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final user = ref.read(authProvider);
     if (user == null) return;
 
-    final todayKey = DateTime.now().dateKey;
-    final balance = ref.read(balancesProvider)[todayKey];
-    if (balance == null) return;
-
     String? selectedAccount;
     final amountCtrl = TextEditingController();
     final notesCtrl = TextEditingController();
@@ -346,36 +348,193 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 if (!formKey.currentState!.validate()) return;
 
                 final amount = double.parse(amountCtrl.text.trim());
-                double aepsOpening = balance.aepsOpeningBalance;
-                double hasibulOpening = balance.hasibulOpeningBalance;
-                double runaLailaOpening = balance.runaLailaOpeningBalance;
-
                 final delta = isAdd ? amount : -amount;
-                switch (selectedAccount) {
-                  case 'aeps':
-                    aepsOpening += delta;
-                  case 'hasibul':
-                    hasibulOpening += delta;
-                  case 'runaLaila':
-                    runaLailaOpening += delta;
-                }
 
-                await ref.read(balancesProvider.notifier).updateOpeningBalances(
+                await ref.read(transactionsProvider.notifier).addTransaction(
+                  type: TransactionType.balanceAdjustment,
+                  customerName: isAdd ? 'Balance Added' : 'Balance Decreased',
+                  amount: delta,
+                  balanceAfterTransaction: 0,
                   userId: user.id,
-                  dateKey: todayKey,
-                  aepsOpening: aepsOpening,
-                  hasibulOpening: hasibulOpening,
-                  runaLailaOpening: runaLailaOpening,
+                  notes: notesCtrl.text.trim().isEmpty ? null : notesCtrl.text.trim(),
+                  account: selectedAccount,
+                  commission: 0,
                 );
 
-              if (ctx.mounted) {
-                Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(isAdd ? 'Balance added' : 'Balance decreased')),
+                if (ctx.mounted) {
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(isAdd ? 'Balance added' : 'Balance decreased')),
+                  );
+                }
+              },
+              child: Text(isAdd ? 'Add' : 'Decrease'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showSelfTransfer() {
+    final user = ref.read(authProvider);
+    if (user == null) return;
+
+    String? fromAccount;
+    String? toAccount;
+    final amountCtrl = TextEditingController();
+    final notesCtrl = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Text('Self Transfer'),
+          content: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('From Account', style: Theme.of(ctx).textTheme.labelLarge),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    _accountBtn(ctx, 'AEPS', Icons.account_balance,
+                        fromAccount == 'aeps', () {
+                      setDialogState(() {
+                        fromAccount = 'aeps';
+                        if (toAccount == 'aeps') toAccount = null;
+                      });
+                    }),
+                    const SizedBox(width: 8),
+                    _accountBtn(ctx, 'Hasibul', Icons.phone_android,
+                        fromAccount == 'hasibul', () {
+                      setDialogState(() {
+                        fromAccount = 'hasibul';
+                        if (toAccount == 'hasibul') toAccount = null;
+                      });
+                    }),
+                    const SizedBox(width: 8),
+                    _accountBtn(ctx, 'Runa Laila', Icons.phone_android,
+                        fromAccount == 'runaLaila', () {
+                      setDialogState(() {
+                        fromAccount = 'runaLaila';
+                        if (toAccount == 'runaLaila') toAccount = null;
+                      });
+                    }),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Text('To Account', style: Theme.of(ctx).textTheme.labelLarge),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    _accountBtn(ctx, 'AEPS', Icons.account_balance,
+                        toAccount == 'aeps', () {
+                      setDialogState(() {
+                        toAccount = 'aeps';
+                        if (fromAccount == 'aeps') fromAccount = null;
+                      });
+                    }),
+                    const SizedBox(width: 8),
+                    _accountBtn(ctx, 'Hasibul', Icons.phone_android,
+                        toAccount == 'hasibul', () {
+                      setDialogState(() {
+                        toAccount = 'hasibul';
+                        if (fromAccount == 'hasibul') fromAccount = null;
+                      });
+                    }),
+                    const SizedBox(width: 8),
+                    _accountBtn(ctx, 'Runa Laila', Icons.phone_android,
+                        toAccount == 'runaLaila', () {
+                      setDialogState(() {
+                        toAccount = 'runaLaila';
+                        if (fromAccount == 'runaLaila') fromAccount = null;
+                      });
+                    }),
+                  ],
+                ),
+                if (fromAccount == null || toAccount == null) ...[
+                  const SizedBox(height: 4),
+                  Text('Select both From and To accounts',
+                      style: TextStyle(color: Theme.of(ctx).colorScheme.error, fontSize: 12)),
+                ] else if (fromAccount == toAccount) ...[
+                  const SizedBox(height: 4),
+                  Text('From and To accounts must be different',
+                      style: TextStyle(color: Theme.of(ctx).colorScheme.error, fontSize: 12)),
+                ],
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: amountCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Amount *',
+                    prefixIcon: Icon(Icons.currency_rupee),
+                  ),
+                  validator: (v) {
+                    if (v?.trim().isEmpty ?? true) return 'Amount required';
+                    final amt = double.tryParse(v!);
+                    if (amt == null || amt <= 0) return 'Enter a valid amount';
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: notesCtrl,
+                  maxLines: 2,
+                  decoration: const InputDecoration(
+                    labelText: 'Notes (optional)',
+                    prefixIcon: Icon(Icons.notes),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () async {
+                if (fromAccount == null || toAccount == null) {
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    const SnackBar(content: Text('Select both accounts')),
+                  );
+                  return;
+                }
+                if (fromAccount == toAccount) {
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    const SnackBar(content: Text('Accounts must be different')),
+                  );
+                  return;
+                }
+                if (!formKey.currentState!.validate()) return;
+
+                final amount = double.parse(amountCtrl.text.trim());
+                final accountLabels = {'aeps': 'AEPS', 'hasibul': 'Hasibul', 'runaLaila': 'Runa Laila'};
+
+                await ref.read(transactionsProvider.notifier).addTransaction(
+                  type: TransactionType.selfTransfer,
+                  customerName: '${accountLabels[fromAccount]} → ${accountLabels[toAccount]}',
+                  amount: amount,
+                  balanceAfterTransaction: 0,
+                  userId: user.id,
+                  notes: notesCtrl.text.trim().isEmpty ? null : notesCtrl.text.trim(),
+                  fromAccount: fromAccount,
+                  toAccount: toAccount,
+                  commission: 0,
                 );
-              }
-            },
-            child: Text(isAdd ? 'Add' : 'Decrease'),
+
+                if (ctx.mounted) {
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Transfer completed')),
+                  );
+                }
+              },
+              child: const Text('Transfer'),
             ),
           ],
         ),

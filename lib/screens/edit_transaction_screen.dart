@@ -48,13 +48,13 @@ class _EditTransactionScreenState extends ConsumerState<EditTransactionScreen> {
     _original = txn;
     _signatureNotifier.value = txn.signatureData;
     _customerNameController.text = txn.customerName;
-    _amountController.text = txn.amount.toStringAsFixed(2);
+    _amountController.text = txn.amount.toStringAsFixed(0);
     _aadhaarController.text = txn.aadhaarNumber ?? '';
     _mobileController.text = txn.mobileNumber ?? '';
     _txnIdController.text = txn.transactionId ?? '';
     _notesController.text = txn.notes ?? '';
     _bankNameController.text = txn.bankName ?? '';
-    _commissionController.text = txn.commission.toStringAsFixed(2);
+    _commissionController.text = txn.commission.toStringAsFixed(0);
     _selectedAccount = txn.phonePeAccount;
     _commissionOverridden = txn.commissionOverridden;
   }
@@ -179,7 +179,7 @@ class _EditTransactionScreenState extends ConsumerState<EditTransactionScreen> {
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            'Detected: ₹${(_calculatedCommission!).toStringAsFixed(2)} commission included',
+                            'Detected: ₹${(_calculatedCommission!).toStringAsFixed(0)} commission included',
                             style: theme.textTheme.bodyMedium?.copyWith(
                               color: theme.colorScheme.onPrimaryContainer,
                               fontWeight: FontWeight.w500,
@@ -303,7 +303,7 @@ class _EditTransactionScreenState extends ConsumerState<EditTransactionScreen> {
                         child: Text(
                           _autoCommission
                               ? (_calculatedCommission != null
-                                  ? 'Commission: ₹${_calculatedCommission!.toStringAsFixed(2)}'
+                                  ? 'Commission: ₹${_calculatedCommission!.toStringAsFixed(0)}'
                                   : 'Auto Commission ON')
                               : 'Auto Commission OFF',
                           style: theme.textTheme.bodyLarge,

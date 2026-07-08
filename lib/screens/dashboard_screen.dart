@@ -112,7 +112,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   leading: Icon(Icons.monetization_on, color: theme.colorScheme.primary),
                   title: const Text("Today's Commission"),
                   trailing: Text(
-                    '₹${todayCommission.toStringAsFixed(2)}',
+                    '₹${todayCommission.toStringAsFixed(0)}',
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                       color: theme.colorScheme.primary,

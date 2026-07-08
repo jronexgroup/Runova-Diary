@@ -118,16 +118,16 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                 children: [
                   _reportRow('Total Transactions', filtered.length.toString()),
                   const Divider(),
-                  _reportRow('Total Amount', '₹${totalAmount.toStringAsFixed(2)}',
+                  _reportRow('Total Amount', '₹${totalAmount.toStringAsFixed(0)}',
                       isBold: true),
                   const Divider(),
-                  _reportRow('AEPS Total', '₹${aepsTotal.toStringAsFixed(2)}'),
+                  _reportRow('AEPS Total', '₹${aepsTotal.toStringAsFixed(0)}'),
                   const Divider(),
-                  _reportRow('Cash In Total', '₹${cashInTotal.toStringAsFixed(2)}'),
+                  _reportRow('Cash In Total', '₹${cashInTotal.toStringAsFixed(0)}'),
                   const Divider(),
-                  _reportRow('Cash Out Total', '₹${cashOutTotal.toStringAsFixed(2)}'),
+                  _reportRow('Cash Out Total', '₹${cashOutTotal.toStringAsFixed(0)}'),
                   const Divider(),
-                  _reportRow('Total Commission', '₹${totalCommission.toStringAsFixed(2)}',
+                  _reportRow('Total Commission', '₹${totalCommission.toStringAsFixed(0)}',
                       isBold: true),
                 ],
               ),
@@ -142,13 +142,13 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
               child: Column(
                 children: [
                   _reportRow('AEPS Balance',
-                      '₹${(dayBalance?.aepsClosingBalance ?? 0).toStringAsFixed(2)}'),
+                      '₹${(dayBalance?.aepsClosingBalance ?? 0).toStringAsFixed(0)}'),
                   const Divider(),
                   _reportRow('Hasibul PhonePe',
-                      '₹${(dayBalance?.hasibulClosingBalance ?? 0).toStringAsFixed(2)}'),
+                      '₹${(dayBalance?.hasibulClosingBalance ?? 0).toStringAsFixed(0)}'),
                   const Divider(),
                   _reportRow('Runa Laila PhonePe',
-                      '₹${(dayBalance?.runaLailaClosingBalance ?? 0).toStringAsFixed(2)}'),
+                      '₹${(dayBalance?.runaLailaClosingBalance ?? 0).toStringAsFixed(0)}'),
                 ],
               ),
             ),
@@ -161,9 +161,13 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                   leading: CircleAvatar(
                     backgroundColor: _typeColor(txn.type).withValues(alpha: 0.2),
                     child: Text(
-                      txn.type == TransactionType.aeps
-                          ? 'A'
-                          : txn.type == TransactionType.cashIn ? 'I' : 'O',
+                      switch (txn.type) {
+                        TransactionType.aeps => 'A',
+                        TransactionType.cashIn => 'I',
+                        TransactionType.cashOut => 'O',
+                        TransactionType.balanceAdjustment => 'ADJ',
+                        TransactionType.selfTransfer => 'TRF',
+                      },
                       style: TextStyle(
                         color: _typeColor(txn.type),
                         fontWeight: FontWeight.bold,
@@ -177,12 +181,12 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Text(
-                        '₹${txn.amount.toStringAsFixed(2)}',
+                        '₹${txn.amount.toStringAsFixed(0)}',
                         style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                       if (txn.commission > 0)
                         Text(
-                          'Comm: ₹${txn.commission.toStringAsFixed(2)}',
+                          'Comm: ₹${txn.commission.toStringAsFixed(0)}',
                           style: theme.textTheme.bodySmall,
                         ),
                     ],
@@ -246,6 +250,10 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
         return Colors.green;
       case TransactionType.cashOut:
         return Colors.orange;
+      case TransactionType.balanceAdjustment:
+        return Colors.purple;
+      case TransactionType.selfTransfer:
+        return Colors.indigo;
     }
   }
 }

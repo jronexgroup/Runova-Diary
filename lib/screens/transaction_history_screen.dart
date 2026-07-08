@@ -81,6 +81,10 @@ class _TransactionHistoryScreenState
         if (t.customerName.toLowerCase().contains(query)) return true;
         if (t.mobileNumber?.toLowerCase().contains(query) == true) return true;
         if (t.transactionId?.toLowerCase().contains(query) == true) return true;
+        if (t.bankName?.toLowerCase().contains(query) == true) return true;
+        if (t.notes?.toLowerCase().contains(query) == true) return true;
+        if (t.aadhaarNumber?.toLowerCase().contains(query) == true) return true;
+        if (t.type.displayName.toLowerCase().contains(query)) return true;
         return false;
       }).toList();
     }
@@ -233,6 +237,10 @@ class _TransactionHistoryScreenState
         return Colors.green;
       case TransactionType.cashOut:
         return Colors.orange;
+      case TransactionType.balanceAdjustment:
+        return Colors.purple;
+      case TransactionType.selfTransfer:
+        return Colors.indigo;
     }
   }
 
@@ -244,6 +252,10 @@ class _TransactionHistoryScreenState
         return 'IN';
       case TransactionType.cashOut:
         return 'OUT';
+      case TransactionType.balanceAdjustment:
+        return 'ADJ';
+      case TransactionType.selfTransfer:
+        return 'TRF';
     }
   }
 
@@ -508,7 +520,7 @@ class _TransactionHistoryScreenState
                               style: const TextStyle(fontWeight: FontWeight.w500),
                             ),
                             subtitle: Text(
-                              '₹${txn.amount.toStringAsFixed(2)} • ${txn.createdAt.displayTime}',
+                              '₹${txn.amount.toStringAsFixed(0)} • ${txn.createdAt.displayTime}',
                             ),
                             trailing: _multiSelectMode
                                 ? null

@@ -114,6 +114,9 @@ class TransactionsNotifier extends StateNotifier<List<Transaction>> {
     double? commission,
     bool commissionOverridden = false,
     String? signatureData,
+    String? account,
+    String? fromAccount,
+    String? toAccount,
   }) async {
     final txn = Transaction.create(
       type: type,
@@ -130,6 +133,9 @@ class TransactionsNotifier extends StateNotifier<List<Transaction>> {
       commission: commission,
       commissionOverridden: commissionOverridden,
       signatureData: signatureData,
+      account: account,
+      fromAccount: fromAccount,
+      toAccount: toAccount,
     );
     final hive = _ref.read(hiveServiceProvider);
     await hive.saveTransaction(txn);
@@ -174,6 +180,13 @@ class TransactionsNotifier extends StateNotifier<List<Transaction>> {
       if (t.customerName.toLowerCase().contains(q)) return true;
       if (t.mobileNumber?.toLowerCase().contains(q) == true) return true;
       if (t.transactionId?.toLowerCase().contains(q) == true) return true;
+      if (t.bankName?.toLowerCase().contains(q) == true) return true;
+      if (t.notes?.toLowerCase().contains(q) == true) return true;
+      if (t.account?.toLowerCase().contains(q) == true) return true;
+      if (t.fromAccount?.toLowerCase().contains(q) == true) return true;
+      if (t.toAccount?.toLowerCase().contains(q) == true) return true;
+      if (t.aadhaarNumber?.toLowerCase().contains(q) == true) return true;
+      if (t.type.displayName.toLowerCase().contains(q)) return true;
       return false;
     }).toList();
   }
@@ -287,6 +300,32 @@ class BalancesNotifier extends StateNotifier<Map<String, DailyBalance>> {
             hasibulClosing -= txn.amount;
           } else {
             runaLailaClosing -= txn.amount;
+          }
+        case TransactionType.balanceAdjustment:
+          switch (txn.account) {
+            case 'aeps':
+              aepsClosing += txn.amount;
+            case 'hasibul':
+              hasibulClosing += txn.amount;
+            case 'runaLaila':
+              runaLailaClosing += txn.amount;
+          }
+        case TransactionType.selfTransfer:
+          switch (txn.fromAccount) {
+            case 'aeps':
+              aepsClosing -= txn.amount;
+            case 'hasibul':
+              hasibulClosing -= txn.amount;
+            case 'runaLaila':
+              runaLailaClosing -= txn.amount;
+          }
+          switch (txn.toAccount) {
+            case 'aeps':
+              aepsClosing += txn.amount;
+            case 'hasibul':
+              hasibulClosing += txn.amount;
+            case 'runaLaila':
+              runaLailaClosing += txn.amount;
           }
       }
     }

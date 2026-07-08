@@ -11,6 +11,9 @@ class CommissionService {
       case TransactionType.cashIn:
       case TransactionType.cashOut:
         return (amount / 1000).ceil() * 10.0;
+      case TransactionType.balanceAdjustment:
+      case TransactionType.selfTransfer:
+        return 0;
     }
   }
 

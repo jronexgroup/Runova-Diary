@@ -33,7 +33,7 @@ class BalanceCard extends StatelessWidget {
                   Text(label, style: theme.textTheme.bodyMedium),
                   const SizedBox(height: 4),
                   Text(
-                    '₹${closing.toStringAsFixed(2)}',
+                    '₹${closing.toStringAsFixed(0)}',
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
@@ -46,7 +46,7 @@ class BalanceCard extends StatelessWidget {
               children: [
                 Text('Open', style: theme.textTheme.bodySmall),
                 Text(
-                  '₹${opening.toStringAsFixed(2)}',
+                  '₹${opening.toStringAsFixed(0)}',
                   style: theme.textTheme.bodySmall,
                 ),
               ],
