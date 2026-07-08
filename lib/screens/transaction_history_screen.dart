@@ -457,28 +457,7 @@ class _TransactionHistoryScreenState
                     itemCount: filtered.length,
                     itemBuilder: (ctx, i) {
                       final txn = filtered[i];
-                      return Dismissible(
-                        key: Key(txn.id),
-                        direction: DismissDirection.endToStart,
-                        background: Container(
-                          color: Colors.red,
-                          alignment: Alignment.centerRight,
-                          padding: const EdgeInsets.only(right: 16),
-                          child: const Icon(Icons.delete, color: Colors.white),
-                        ),
-                        onDismissed: (_) async {
-                          final pinOk = await _requirePin();
-                          if (!pinOk) {
-                            if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Incorrect PIN')),
-                              );
-                            }
-                            return;
-                          }
-                          _deleteTransaction(txn);
-                        },
-                        child: Card(
+                      return Card(
                           child: ListTile(
                             onTap: _multiSelectMode
                                 ? () {
@@ -520,7 +499,7 @@ class _TransactionHistoryScreenState
                               style: const TextStyle(fontWeight: FontWeight.w500),
                             ),
                             subtitle: Text(
-                              '₹${txn.amount.toStringAsFixed(0)} • ${txn.createdAt.displayTime}',
+                              '₹${txn.amount.toStringAsFixed(2)} • ${txn.createdAt.displayTime}',
                             ),
                             trailing: _multiSelectMode
                                 ? null
@@ -571,7 +550,6 @@ class _TransactionHistoryScreenState
                                       ),
                                     ],
                                   ),
-                          ),
                         ),
                       );
                     },

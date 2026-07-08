@@ -118,16 +118,16 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                 children: [
                   _reportRow('Total Transactions', filtered.length.toString()),
                   const Divider(),
-                  _reportRow('Total Amount', '₹${totalAmount.toStringAsFixed(0)}',
+                  _reportRow('Total Amount', '₹${totalAmount.toStringAsFixed(2)}',
                       isBold: true),
                   const Divider(),
-                  _reportRow('AEPS Total', '₹${aepsTotal.toStringAsFixed(0)}'),
+                  _reportRow('AEPS Total', '₹${aepsTotal.toStringAsFixed(2)}'),
                   const Divider(),
-                  _reportRow('Cash In Total', '₹${cashInTotal.toStringAsFixed(0)}'),
+                  _reportRow('Cash In Total', '₹${cashInTotal.toStringAsFixed(2)}'),
                   const Divider(),
-                  _reportRow('Cash Out Total', '₹${cashOutTotal.toStringAsFixed(0)}'),
+                  _reportRow('Cash Out Total', '₹${cashOutTotal.toStringAsFixed(2)}'),
                   const Divider(),
-                  _reportRow('Total Commission', '₹${totalCommission.toStringAsFixed(0)}',
+                  _reportRow('Total Commission', '₹${totalCommission.toStringAsFixed(2)}',
                       isBold: true),
                 ],
               ),
@@ -142,13 +142,13 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
               child: Column(
                 children: [
                   _reportRow('AEPS Balance',
-                      '₹${(dayBalance?.aepsClosingBalance ?? 0).toStringAsFixed(0)}'),
+                      '₹${(dayBalance?.aepsClosingBalance ?? 0).toStringAsFixed(2)}'),
                   const Divider(),
                   _reportRow('Hasibul PhonePe',
-                      '₹${(dayBalance?.hasibulClosingBalance ?? 0).toStringAsFixed(0)}'),
+                      '₹${(dayBalance?.hasibulClosingBalance ?? 0).toStringAsFixed(2)}'),
                   const Divider(),
                   _reportRow('Runa Laila PhonePe',
-                      '₹${(dayBalance?.runaLailaClosingBalance ?? 0).toStringAsFixed(0)}'),
+                      '₹${(dayBalance?.runaLailaClosingBalance ?? 0).toStringAsFixed(2)}'),
                 ],
               ),
             ),
@@ -181,12 +181,12 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Text(
-                        '₹${txn.amount.toStringAsFixed(0)}',
+                        '₹${txn.amount.toStringAsFixed(2)}',
                         style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                       if (txn.commission > 0)
                         Text(
-                          'Comm: ₹${txn.commission.toStringAsFixed(0)}',
+                          'Comm: ₹${txn.commission.toStringAsFixed(2)}',
                           style: theme.textTheme.bodySmall,
                         ),
                     ],

@@ -37,7 +37,7 @@ class SummaryCard extends StatelessWidget {
               ),
             ),
             Text(
-              '₹${amount.toStringAsFixed(0)}',
+              '₹${amount.toStringAsFixed(2)}',
               style: theme.textTheme.bodySmall,
             ),
           ],
