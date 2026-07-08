@@ -102,11 +102,15 @@ class _EditTransactionScreenState extends ConsumerState<EditTransactionScreen> {
     final commission = _commissionOverridden
         ? (double.tryParse(_commissionController.text.trim()) ?? 0.0)
         : (_autoCommission ? (_calculatedCommission ?? 0.0) : 0.0);
+    final distributorComm = (_original!.type == TransactionType.aeps && !_commissionOverridden)
+        ? ref.read(commissionServiceProvider).getDistributorCommission(amount)
+        : _original!.distributorCommission;
 
     final updated = _original!.copyWith(
       customerName: _customerNameController.text.trim(),
       amount: amount,
       commission: commission,
+      distributorCommission: distributorComm,
       commissionOverridden: _commissionOverridden,
       mobileNumber: _mobileController.text.trim().isEmpty
           ? null

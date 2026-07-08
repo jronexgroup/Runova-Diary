@@ -75,8 +75,11 @@ class _NewTransactionScreenState extends ConsumerState<NewTransactionScreen> {
     final todayBalance = ref.read(balancesProvider)[todayKey];
 
     double newBalance;
+    final distributorComm = widget.type == TransactionType.aeps
+        ? ref.read(commissionServiceProvider).getDistributorCommission(amount)
+        : 0.0;
     if (widget.type == TransactionType.aeps) {
-      newBalance = (todayBalance?.aepsOpeningBalance ?? 0) + amount;
+      newBalance = (todayBalance?.aepsOpeningBalance ?? 0) + amount + distributorComm;
     } else if (widget.type == TransactionType.cashIn) {
       final currentBal = _selectedAccount == PhonePeAccount.hasibul
           ? (todayBalance?.hasibulClosingBalance ?? todayBalance?.hasibulOpeningBalance ?? 0)
@@ -121,6 +124,7 @@ class _NewTransactionScreenState extends ConsumerState<NewTransactionScreen> {
         phonePeAccount: _selectedAccount,
         commission: commission,
         commissionOverridden: _commissionOverridden,
+        distributorCommission: distributorComm,
         signatureData: _signatureNotifier.value,
       );
 
@@ -161,7 +165,8 @@ class _NewTransactionScreenState extends ConsumerState<NewTransactionScreen> {
     final todayBalance = ref.read(balancesProvider)[todayKey];
 
     if (widget.type == TransactionType.aeps) {
-      return (todayBalance?.aepsClosingBalance ?? todayBalance?.aepsOpeningBalance ?? 0) + amount;
+      final distributorComm = ref.read(commissionServiceProvider).getDistributorCommission(amount);
+      return (todayBalance?.aepsClosingBalance ?? todayBalance?.aepsOpeningBalance ?? 0) + amount + distributorComm;
     } else if (widget.type == TransactionType.cashIn) {
       if (_selectedAccount == null) return null;
       final currentBal = _selectedAccount == PhonePeAccount.hasibul

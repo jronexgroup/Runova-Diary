@@ -117,6 +117,7 @@ class TransactionsNotifier extends StateNotifier<List<Transaction>> {
     String? account,
     String? fromAccount,
     String? toAccount,
+    double? distributorCommission,
   }) async {
     final txn = Transaction.create(
       type: type,
@@ -136,6 +137,7 @@ class TransactionsNotifier extends StateNotifier<List<Transaction>> {
       account: account,
       fromAccount: fromAccount,
       toAccount: toAccount,
+      distributorCommission: distributorCommission,
     );
     final hive = _ref.read(hiveServiceProvider);
     await hive.saveTransaction(txn);
@@ -288,7 +290,7 @@ class BalancesNotifier extends StateNotifier<Map<String, DailyBalance>> {
     for (final txn in dayTxns) {
       switch (txn.type) {
         case TransactionType.aeps:
-          aepsClosing += txn.amount;
+          aepsClosing += txn.amount + txn.distributorCommission;
         case TransactionType.cashIn:
           if (txn.phonePeAccount == PhonePeAccount.hasibul) {
             hasibulClosing += txn.amount;
@@ -313,7 +315,7 @@ class BalancesNotifier extends StateNotifier<Map<String, DailyBalance>> {
         case TransactionType.selfTransfer:
           switch (txn.fromAccount) {
             case 'aeps':
-              aepsClosing -= txn.amount;
+              aepsClosing -= txn.amount + txn.commission;
             case 'hasibul':
               hasibulClosing -= txn.amount;
             case 'runaLaila':

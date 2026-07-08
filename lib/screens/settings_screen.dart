@@ -385,159 +385,218 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final amountCtrl = TextEditingController();
     final notesCtrl = TextEditingController();
     final formKey = GlobalKey<FormState>();
+    bool isNEFT = true;
 
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          title: const Text('Self Transfer'),
-          content: Form(
-            key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text('From Account', style: Theme.of(ctx).textTheme.labelLarge),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    _accountBtn(ctx, 'AEPS', Icons.account_balance,
-                        fromAccount == 'aeps', () {
-                      setDialogState(() {
-                        fromAccount = 'aeps';
-                        if (toAccount == 'aeps') toAccount = null;
-                      });
-                    }),
-                    const SizedBox(width: 8),
-                    _accountBtn(ctx, 'Hasibul', Icons.phone_android,
-                        fromAccount == 'hasibul', () {
-                      setDialogState(() {
-                        fromAccount = 'hasibul';
-                        if (toAccount == 'hasibul') toAccount = null;
-                      });
-                    }),
-                    const SizedBox(width: 8),
-                    _accountBtn(ctx, 'Runa Laila', Icons.phone_android,
-                        fromAccount == 'runaLaila', () {
-                      setDialogState(() {
-                        fromAccount = 'runaLaila';
-                        if (toAccount == 'runaLaila') toAccount = null;
-                      });
-                    }),
+        builder: (ctx, setDialogState) {
+          double charge = 0;
+          if (fromAccount == 'aeps') {
+            final amt = double.tryParse(amountCtrl.text);
+            if (amt != null && amt > 0) {
+              charge = ref.read(commissionServiceProvider).getSettlementCharge(amt);
+            }
+          }
+          return AlertDialog(
+            title: const Text('Self Transfer'),
+            content: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('From Account', style: Theme.of(ctx).textTheme.labelLarge),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      _accountBtn(ctx, 'AEPS', Icons.account_balance,
+                          fromAccount == 'aeps', () {
+                        setDialogState(() {
+                          fromAccount = 'aeps';
+                          if (toAccount == 'aeps') toAccount = null;
+                        });
+                      }),
+                      const SizedBox(width: 8),
+                      _accountBtn(ctx, 'Hasibul', Icons.phone_android,
+                          fromAccount == 'hasibul', () {
+                        setDialogState(() {
+                          fromAccount = 'hasibul';
+                          if (toAccount == 'hasibul') toAccount = null;
+                        });
+                      }),
+                      const SizedBox(width: 8),
+                      _accountBtn(ctx, 'Runa Laila', Icons.phone_android,
+                          fromAccount == 'runaLaila', () {
+                        setDialogState(() {
+                          fromAccount = 'runaLaila';
+                          if (toAccount == 'runaLaila') toAccount = null;
+                        });
+                      }),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Text('To Account', style: Theme.of(ctx).textTheme.labelLarge),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      _accountBtn(ctx, 'AEPS', Icons.account_balance,
+                          toAccount == 'aeps', () {
+                        setDialogState(() {
+                          toAccount = 'aeps';
+                          if (fromAccount == 'aeps') fromAccount = null;
+                        });
+                      }),
+                      const SizedBox(width: 8),
+                      _accountBtn(ctx, 'Hasibul', Icons.phone_android,
+                          toAccount == 'hasibul', () {
+                        setDialogState(() {
+                          toAccount = 'hasibul';
+                          if (fromAccount == 'hasibul') fromAccount = null;
+                        });
+                      }),
+                      const SizedBox(width: 8),
+                      _accountBtn(ctx, 'Runa Laila', Icons.phone_android,
+                          toAccount == 'runaLaila', () {
+                        setDialogState(() {
+                          toAccount = 'runaLaila';
+                          if (fromAccount == 'runaLaila') fromAccount = null;
+                        });
+                      }),
+                    ],
+                  ),
+                  if (fromAccount == null || toAccount == null) ...[
+                    const SizedBox(height: 4),
+                    Text('Select both From and To accounts',
+                        style: TextStyle(color: Theme.of(ctx).colorScheme.error, fontSize: 12)),
+                  ] else if (fromAccount == toAccount) ...[
+                    const SizedBox(height: 4),
+                    Text('From and To accounts must be different',
+                        style: TextStyle(color: Theme.of(ctx).colorScheme.error, fontSize: 12)),
                   ],
-                ),
-                const SizedBox(height: 16),
-                Text('To Account', style: Theme.of(ctx).textTheme.labelLarge),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    _accountBtn(ctx, 'AEPS', Icons.account_balance,
-                        toAccount == 'aeps', () {
-                      setDialogState(() {
-                        toAccount = 'aeps';
-                        if (fromAccount == 'aeps') fromAccount = null;
-                      });
-                    }),
-                    const SizedBox(width: 8),
-                    _accountBtn(ctx, 'Hasibul', Icons.phone_android,
-                        toAccount == 'hasibul', () {
-                      setDialogState(() {
-                        toAccount = 'hasibul';
-                        if (fromAccount == 'hasibul') fromAccount = null;
-                      });
-                    }),
-                    const SizedBox(width: 8),
-                    _accountBtn(ctx, 'Runa Laila', Icons.phone_android,
-                        toAccount == 'runaLaila', () {
-                      setDialogState(() {
-                        toAccount = 'runaLaila';
-                        if (fromAccount == 'runaLaila') fromAccount = null;
-                      });
-                    }),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: amountCtrl,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Amount *',
+                      prefixIcon: Icon(Icons.currency_rupee),
+                    ),
+                    onChanged: (_) => setDialogState(() {}),
+                    validator: (v) {
+                      if (v?.trim().isEmpty ?? true) return 'Amount required';
+                      final amt = double.tryParse(v!);
+                      if (amt == null || amt <= 0) return 'Enter a valid amount';
+                      return null;
+                    },
+                  ),
+                  if (fromAccount == 'aeps' && charge > 0) ...[
+                    const SizedBox(height: 12),
+                    Card(
+                      color: Theme.of(ctx).colorScheme.tertiaryContainer,
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Column(
+                          children: [
+                            Row(
+                              children: [
+                                const Text('Settlement Type: '),
+                                const SizedBox(width: 8),
+                                ChoiceChip(
+                                  label: const Text('NEFT'),
+                                  selected: isNEFT,
+                                  onSelected: (v) => setDialogState(() => isNEFT = v),
+                                ),
+                                const SizedBox(width: 8),
+                                ChoiceChip(
+                                  label: const Text('IMPS'),
+                                  selected: !isNEFT,
+                                  onSelected: (v) => setDialogState(() => isNEFT = !v),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Settlement charge: ₹${charge.toStringAsFixed(2)}',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Theme.of(ctx).colorScheme.onTertiaryContainer,
+                              ),
+                            ),
+                            Text(
+                              'AEPS will be debited: ₹${(double.tryParse(amountCtrl.text) ?? 0) + charge}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Theme.of(ctx).colorScheme.onTertiaryContainer,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   ],
-                ),
-                if (fromAccount == null || toAccount == null) ...[
-                  const SizedBox(height: 4),
-                  Text('Select both From and To accounts',
-                      style: TextStyle(color: Theme.of(ctx).colorScheme.error, fontSize: 12)),
-                ] else if (fromAccount == toAccount) ...[
-                  const SizedBox(height: 4),
-                  Text('From and To accounts must be different',
-                      style: TextStyle(color: Theme.of(ctx).colorScheme.error, fontSize: 12)),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: notesCtrl,
+                    maxLines: 2,
+                    decoration: const InputDecoration(
+                      labelText: 'Notes (optional)',
+                      prefixIcon: Icon(Icons.notes),
+                    ),
+                  ),
                 ],
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: amountCtrl,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Amount *',
-                    prefixIcon: Icon(Icons.currency_rupee),
-                  ),
-                  validator: (v) {
-                    if (v?.trim().isEmpty ?? true) return 'Amount required';
-                    final amt = double.tryParse(v!);
-                    if (amt == null || amt <= 0) return 'Enter a valid amount';
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: notesCtrl,
-                  maxLines: 2,
-                  decoration: const InputDecoration(
-                    labelText: 'Notes (optional)',
-                    prefixIcon: Icon(Icons.notes),
-                  ),
-                ),
-              ],
+              ),
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () async {
-                if (fromAccount == null || toAccount == null) {
-                  ScaffoldMessenger.of(ctx).showSnackBar(
-                    const SnackBar(content: Text('Select both accounts')),
-                  );
-                  return;
-                }
-                if (fromAccount == toAccount) {
-                  ScaffoldMessenger.of(ctx).showSnackBar(
-                    const SnackBar(content: Text('Accounts must be different')),
-                  );
-                  return;
-                }
-                if (!formKey.currentState!.validate()) return;
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () async {
+                  if (fromAccount == null || toAccount == null) {
+                    ScaffoldMessenger.of(ctx).showSnackBar(
+                      const SnackBar(content: Text('Select both accounts')),
+                    );
+                    return;
+                  }
+                  if (fromAccount == toAccount) {
+                    ScaffoldMessenger.of(ctx).showSnackBar(
+                      const SnackBar(content: Text('Accounts must be different')),
+                    );
+                    return;
+                  }
+                  if (!formKey.currentState!.validate()) return;
 
-                final amount = double.parse(amountCtrl.text.trim());
-                final accountLabels = {'aeps': 'AEPS', 'hasibul': 'Hasibul', 'runaLaila': 'Runa Laila'};
+                  final amount = double.parse(amountCtrl.text.trim());
+                  final settlementCharge = fromAccount == 'aeps'
+                      ? ref.read(commissionServiceProvider).getSettlementCharge(amount)
+                      : 0.0;
+                  final accountLabels = {'aeps': 'AEPS', 'hasibul': 'Hasibul', 'runaLaila': 'Runa Laila'};
 
-                await ref.read(transactionsProvider.notifier).addTransaction(
-                  type: TransactionType.selfTransfer,
-                  customerName: '${accountLabels[fromAccount]} → ${accountLabels[toAccount]}',
-                  amount: amount,
-                  balanceAfterTransaction: 0,
-                  userId: user.id,
-                  notes: notesCtrl.text.trim().isEmpty ? null : notesCtrl.text.trim(),
-                  fromAccount: fromAccount,
-                  toAccount: toAccount,
-                  commission: 0,
-                );
-
-                if (ctx.mounted) {
-                  Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Transfer completed')),
+                  await ref.read(transactionsProvider.notifier).addTransaction(
+                    type: TransactionType.selfTransfer,
+                    customerName: '${accountLabels[fromAccount]} → ${accountLabels[toAccount]}',
+                    amount: amount,
+                    balanceAfterTransaction: 0,
+                    userId: user.id,
+                    notes: notesCtrl.text.trim().isEmpty ? null : notesCtrl.text.trim(),
+                    fromAccount: fromAccount,
+                    toAccount: toAccount,
+                    commission: settlementCharge,
                   );
-                }
-              },
-              child: const Text('Transfer'),
-            ),
-          ],
-        ),
+
+                  if (ctx.mounted) {
+                    Navigator.pop(ctx);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Transfer completed')),
+                    );
+                  }
+                },
+                child: const Text('Transfer'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

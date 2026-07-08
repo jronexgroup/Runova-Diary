@@ -11,6 +11,7 @@ class Transaction {
   final String customerName;
   final double amount;
   final double commission;
+  final double distributorCommission;
   final bool commissionOverridden;
   final String? mobileNumber;
   final String? aadhaarNumber;
@@ -32,6 +33,7 @@ class Transaction {
     required this.customerName,
     required this.amount,
     required this.commission,
+    this.distributorCommission = 0,
     required this.balanceAfterTransaction,
     required this.createdAt,
     required this.userId,
@@ -54,6 +56,7 @@ class Transaction {
     String? customerName,
     double? amount,
     double? commission,
+    double? distributorCommission,
     bool? commissionOverridden,
     String? mobileNumber,
     String? aadhaarNumber,
@@ -75,6 +78,7 @@ class Transaction {
       customerName: customerName ?? this.customerName,
       amount: amount ?? this.amount,
       commission: commission ?? this.commission,
+      distributorCommission: distributorCommission ?? this.distributorCommission,
       commissionOverridden: commissionOverridden ?? this.commissionOverridden,
       mobileNumber: mobileNumber ?? this.mobileNumber,
       aadhaarNumber: aadhaarNumber ?? this.aadhaarNumber,
@@ -98,6 +102,7 @@ class Transaction {
     'customerName': customerName,
     'amount': amount,
     'commission': commission,
+    'distributorCommission': distributorCommission,
     'commissionOverridden': commissionOverridden,
     'mobileNumber': mobileNumber,
     'aadhaarNumber': aadhaarNumber,
@@ -121,6 +126,7 @@ class Transaction {
       customerName: json['customerName'] as String,
       amount: (json['amount'] as num).toDouble(),
       commission: (json['commission'] as num).toDouble(),
+      distributorCommission: (json['distributorCommission'] as num?)?.toDouble() ?? 0,
       commissionOverridden: json['commissionOverridden'] as bool? ?? false,
       mobileNumber: json['mobileNumber'] as String?,
       aadhaarNumber: json['aadhaarNumber'] as String?,
@@ -153,6 +159,7 @@ class Transaction {
     String? bankName,
     PhonePeAccount? phonePeAccount,
     double? commission,
+    double? distributorCommission,
     bool commissionOverridden = false,
     String? signatureData,
     String? account,
@@ -160,14 +167,15 @@ class Transaction {
     String? toAccount,
   }) {
     final now = DateTime.now();
-    final commissionValue = commission ?? _calculateCommission(amount, type);
+    final commissionValue = commission ?? 0;
     return Transaction(
       id: _uuid.v4(),
       type: type,
       customerName: customerName,
       amount: amount,
       commission: commissionValue,
-      commissionOverridden: commission != null || commissionOverridden,
+      distributorCommission: distributorCommission ?? 0,
+      commissionOverridden: commissionValue > 0 || commissionOverridden,
       balanceAfterTransaction: balanceAfterTransaction,
       createdAt: now,
       userId: userId,
@@ -182,12 +190,5 @@ class Transaction {
       fromAccount: fromAccount,
       toAccount: toAccount,
     );
-  }
-
-  static double _calculateCommission(double amount, TransactionType type) {
-    if (type != TransactionType.aeps) return 0;
-    final base = (amount / 1000).ceil() * 10.0;
-    final extra = amount * 13.0 / 10000.0;
-    return base + extra;
   }
 }

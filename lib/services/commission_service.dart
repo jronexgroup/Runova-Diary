@@ -5,7 +5,6 @@ class CommissionService {
     if (amount <= 0) return 0;
     switch (type) {
       case TransactionType.aeps:
-        return (amount / 1000).ceil() * 10.0;
       case TransactionType.cashIn:
       case TransactionType.cashOut:
         return (amount / 1000).ceil() * 10.0;
@@ -13,6 +12,16 @@ class CommissionService {
       case TransactionType.selfTransfer:
         return 0;
     }
+  }
+
+  double getDistributorCommission(double amount) {
+    if (amount <= 0) return 0;
+    return DistributorCommissionChart.getCommission(amount);
+  }
+
+  double getSettlementCharge(double amount) {
+    if (amount <= 0) return 0;
+    return SettlementChargeChart.getCharge(amount);
   }
 
   (double baseAmount, double commission) smartDetect(double total) {

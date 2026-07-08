@@ -89,14 +89,21 @@ class _TransactionHistoryScreenState
       }).toList();
     }
 
-    if (_typeFilter != null) {
-      filtered = filtered.where((t) => t.type == _typeFilter).toList();
+    if (_startDate != null && _endDate != null) {
+      final startKey = _startDate!.dateKey;
+      final endKey = _endDate!.dateKey;
+      filtered = filtered.where((t) =>
+          t.createdAt.dateKey.compareTo(startKey) >= 0 &&
+          t.createdAt.dateKey.compareTo(endKey) <= 0).toList();
+    } else {
+      final today = DateTime.now();
+      final yesterday = today.subtract(const Duration(days: 1));
+      filtered = filtered.where((t) =>
+          t.createdAt.isSameDay(today) || t.createdAt.isSameDay(yesterday)).toList();
     }
 
-    if (_startDate != null && _endDate != null) {
-      filtered = filtered.where((t) =>
-          t.createdAt.isAfter(_startDate!.subtract(const Duration(days: 1))) &&
-          t.createdAt.isBefore(_endDate!.add(const Duration(days: 1)))).toList();
+    if (_typeFilter != null) {
+      filtered = filtered.where((t) => t.type == _typeFilter).toList();
     }
 
     return filtered;
@@ -259,6 +266,26 @@ class _TransactionHistoryScreenState
     }
   }
 
+  Widget _filterChip({
+    required String label,
+    required IconData icon,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: ActionChip(
+        avatar: Icon(icon, size: 18),
+        label: Text(label),
+        onPressed: onTap,
+        side: selected ? BorderSide(
+          color: Theme.of(context).colorScheme.primary,
+          width: 1.5,
+        ) : null,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -319,6 +346,107 @@ class _TransactionHistoryScreenState
             ),
           ),
           if (_showFilters) ...[
+            const SizedBox(height: 4),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: [
+                  _filterChip(
+                    label: 'Default',
+                    icon: Icons.home,
+                    selected: _startDate == null && _typeFilter == null,
+                    onTap: () => setState(() {
+                      _typeFilter = null;
+                      _startDate = null;
+                      _endDate = null;
+                    }),
+                  ),
+                  _filterChip(
+                    label: 'Today',
+                    icon: Icons.today,
+                    selected: _startDate != null && _startDate!.isToday && _startDate == _endDate,
+                    onTap: () {
+                      final now = DateTime.now();
+                      setState(() {
+                        _startDate = now;
+                        _endDate = now;
+                      });
+                    },
+                  ),
+                  _filterChip(
+                    label: 'Yesterday',
+                    icon: Icons.date_range,
+                    selected: _startDate != null && _startDate!.isYesterday && _startDate == _endDate,
+                    onTap: () {
+                      final yesterday = DateTime.now().subtract(const Duration(days: 1));
+                      setState(() {
+                        _startDate = yesterday;
+                        _endDate = yesterday;
+                      });
+                    },
+                  ),
+                  _filterChip(
+                    label: 'Pick Date',
+                    icon: Icons.calendar_today,
+                    selected: _startDate != null && _startDate == _endDate &&
+                        !_startDate!.isToday && !_startDate!.isYesterday,
+                    onTap: () async {
+                      final date = await showDatePicker(
+                        context: context,
+                        initialDate: DateTime.now(),
+                        firstDate: DateTime(2020),
+                        lastDate: DateTime.now().add(const Duration(days: 1)),
+                      );
+                      if (date != null) {
+                        setState(() {
+                          _startDate = date;
+                          _endDate = date;
+                        });
+                      }
+                    },
+                  ),
+                  _filterChip(
+                    label: 'Custom',
+                    icon: Icons.date_range,
+                    selected: _startDate != null && _endDate != null && _startDate != _endDate,
+                    onTap: () async {
+                      final range = await showDateRangePicker(
+                        context: context,
+                        firstDate: DateTime(2020),
+                        lastDate: DateTime.now().add(const Duration(days: 1)),
+                      );
+                      if (range != null) {
+                        setState(() {
+                          _startDate = range.start;
+                          _endDate = range.end;
+                        });
+                      }
+                    },
+                  ),
+                  if (_startDate != null && _endDate != null && _startDate == _endDate)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: ActionChip(
+                        avatar: Icon(Icons.delete, size: 18, color: Colors.red),
+                        label: const Text('Delete Date', style: TextStyle(color: Colors.red)),
+                        onPressed: () => _deleteTransactionsForDate(_startDate!),
+                      ),
+                    ),
+                  if (_typeFilter != null)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: Chip(
+                        avatar: Icon(Icons.filter_alt, size: 16),
+                        label: Text(_typeFilter!.displayName),
+                        deleteIcon: const Icon(Icons.close, size: 16),
+                        onDeleted: () => setState(() => _typeFilter = null),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -333,97 +461,11 @@ class _TransactionHistoryScreenState
                         selected: selected,
                         onSelected: (v) =>
                             setState(() => _typeFilter = v ? type : null),
+                        showCheckmark: false,
+                        visualDensity: VisualDensity.compact,
                       ),
                     );
                   }),
-                  Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: ActionChip(
-                      avatar: Icon(Icons.today, size: 18),
-                      label: const Text('Today'),
-                      onPressed: () {
-                        final now = DateTime.now();
-                        setState(() {
-                          _startDate = now;
-                          _endDate = now;
-                        });
-                      },
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: ActionChip(
-                      avatar: Icon(Icons.date_range, size: 18),
-                      label: const Text('Yesterday'),
-                      onPressed: () {
-                        final yesterday = DateTime.now().subtract(const Duration(days: 1));
-                        setState(() {
-                          _startDate = yesterday;
-                          _endDate = yesterday;
-                        });
-                      },
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: ActionChip(
-                      avatar: Icon(Icons.date_range, size: 18),
-                      label: const Text('Pick Date'),
-                      onPressed: () async {
-                        final date = await showDatePicker(
-                          context: context,
-                          initialDate: DateTime.now(),
-                          firstDate: DateTime(2020),
-                          lastDate: DateTime.now().add(const Duration(days: 1)),
-                        );
-                        if (date != null) {
-                          setState(() {
-                            _startDate = date;
-                            _endDate = date;
-                          });
-                        }
-                      },
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: ActionChip(
-                      avatar: Icon(Icons.date_range, size: 18),
-                      label: const Text('Custom'),
-                      onPressed: () async {
-                        final range = await showDateRangePicker(
-                          context: context,
-                          firstDate: DateTime(2020),
-                          lastDate: DateTime.now().add(const Duration(days: 1)),
-                        );
-                        if (range != null) {
-                          setState(() {
-                            _startDate = range.start;
-                            _endDate = range.end;
-                          });
-                        }
-                      },
-                    ),
-                  ),
-                  if (_startDate != null && _endDate != null && _startDate == _endDate)
-                    Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: ActionChip(
-                        avatar: Icon(Icons.delete, size: 18, color: Colors.red),
-                        label: const Text('Delete Date', style: TextStyle(color: Colors.red)),
-                        onPressed: () => _deleteTransactionsForDate(_startDate!),
-                      ),
-                    ),
-                  if (_startDate != null || _typeFilter != null)
-                    ActionChip(
-                      avatar: Icon(Icons.clear, size: 18),
-                      label: const Text('Clear'),
-                      onPressed: () => setState(() {
-                        _typeFilter = null;
-                        _startDate = null;
-                        _endDate = null;
-                      }),
-                    ),
                 ],
               ),
             ),
