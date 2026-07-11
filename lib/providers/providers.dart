@@ -1,4 +1,7 @@
+import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../models/bank_account.dart';
+import '../models/commission_config.dart';
 import '../models/daily_balance.dart';
 import '../models/transaction.dart';
 import '../models/user.dart';
@@ -286,49 +289,38 @@ class BalancesNotifier extends StateNotifier<Map<String, DailyBalance>> {
     double aepsClosing = balance.aepsOpeningBalance;
     double hasibulClosing = balance.hasibulOpeningBalance;
     double runaLailaClosing = balance.runaLailaOpeningBalance;
+    final customBal = Map<String, double>.from(balance.customBalances);
+
+    String resolveAccountId(Transaction txn) {
+      return txn.account ?? txn.phonePeAccount?.name ?? '';
+    }
+
+    void adjustBalance(String acctId, double amount) {
+      switch (acctId) {
+        case 'aeps':
+          aepsClosing += amount;
+        case 'hasibul':
+          hasibulClosing += amount;
+        case 'runaLaila':
+          runaLailaClosing += amount;
+        default:
+          customBal[acctId] = (customBal[acctId] ?? 0) + amount;
+      }
+    }
 
     for (final txn in dayTxns) {
       switch (txn.type) {
         case TransactionType.aeps:
           aepsClosing += txn.amount + txn.distributorCommission;
         case TransactionType.cashIn:
-          if (txn.phonePeAccount == PhonePeAccount.hasibul) {
-            hasibulClosing += txn.amount;
-          } else {
-            runaLailaClosing += txn.amount;
-          }
+          adjustBalance(resolveAccountId(txn), txn.amount);
         case TransactionType.cashOut:
-          if (txn.phonePeAccount == PhonePeAccount.hasibul) {
-            hasibulClosing -= txn.amount;
-          } else {
-            runaLailaClosing -= txn.amount;
-          }
+          adjustBalance(resolveAccountId(txn), -txn.amount);
         case TransactionType.balanceAdjustment:
-          switch (txn.account) {
-            case 'aeps':
-              aepsClosing += txn.amount;
-            case 'hasibul':
-              hasibulClosing += txn.amount;
-            case 'runaLaila':
-              runaLailaClosing += txn.amount;
-          }
+          adjustBalance(txn.account ?? '', txn.amount);
         case TransactionType.selfTransfer:
-          switch (txn.fromAccount) {
-            case 'aeps':
-              aepsClosing -= txn.amount + txn.commission;
-            case 'hasibul':
-              hasibulClosing -= txn.amount;
-            case 'runaLaila':
-              runaLailaClosing -= txn.amount;
-          }
-          switch (txn.toAccount) {
-            case 'aeps':
-              aepsClosing += txn.amount;
-            case 'hasibul':
-              hasibulClosing += txn.amount;
-            case 'runaLaila':
-              runaLailaClosing += txn.amount;
-          }
+          adjustBalance(txn.fromAccount ?? '', -(txn.amount + txn.commission));
+          adjustBalance(txn.toAccount ?? '', txn.amount);
       }
     }
 
@@ -336,6 +328,7 @@ class BalancesNotifier extends StateNotifier<Map<String, DailyBalance>> {
       aepsClosingBalance: aepsClosing,
       hasibulClosingBalance: hasibulClosing,
       runaLailaClosingBalance: runaLailaClosing,
+      customBalances: customBal,
     );
     await hive.saveBalance(updated);
     _ref.read(syncServiceProvider).pushBalance(updated);
@@ -344,5 +337,149 @@ class BalancesNotifier extends StateNotifier<Map<String, DailyBalance>> {
 
   Future<void> recalculateDayBalances(String userId, String dateKey) async {
     await recalculateBalance(userId, dateKey);
+  }
+}
+
+final accountsProvider = StateNotifierProvider<AccountsNotifier, List<BankAccount>>((ref) {
+  return AccountsNotifier(ref);
+});
+
+class AccountsNotifier extends StateNotifier<List<BankAccount>> {
+  final Ref _ref;
+
+  AccountsNotifier(this._ref) : super([]);
+
+  void load(String userId) {
+    final json = _ref.read(hiveServiceProvider).getAccountsJson(userId);
+    if (json != null) {
+      try {
+        final list = (jsonDecode(json) as List)
+            .map((j) => BankAccount.fromJson(j as Map<String, dynamic>))
+            .toList();
+        state = list;
+        return;
+      } catch (_) {}
+    }
+    state = _defaultAccounts();
+  }
+
+  List<BankAccount> _defaultAccounts() => [
+    BankAccount.create(name: 'Hasibul', holderName: '', bankName: 'PhonePe'),
+    BankAccount.create(name: 'Runa Laila', holderName: '', bankName: 'PhonePe'),
+  ];
+
+  Future<void> save(String userId) async {
+    final jsonStr = jsonEncode(state.map((a) => a.toJson()).toList());
+    await _ref.read(hiveServiceProvider).saveAccountsJson(userId, jsonStr);
+    _ref.read(syncServiceProvider).pushAccounts(userId, state);
+  }
+
+  Future<void> addAccount(BankAccount account, String userId) async {
+    if (state.length >= 5) return;
+    state = [...state, account];
+    await save(userId);
+  }
+
+  Future<void> updateAccount(int index, BankAccount account, String userId) async {
+    final list = [...state];
+    list[index] = account;
+    state = list;
+    await save(userId);
+  }
+
+  Future<void> deleteAccount(int index, String userId) async {
+    final list = [...state];
+    list.removeAt(index);
+    state = list;
+    await save(userId);
+  }
+}
+
+final commissionConfigsProvider = StateNotifierProvider<CommissionConfigsNotifier, Map<String, dynamic>>((ref) {
+  return CommissionConfigsNotifier(ref);
+});
+
+class CommissionConfigsNotifier extends StateNotifier<Map<String, dynamic>> {
+  final Ref _ref;
+
+  CommissionConfigsNotifier(this._ref) : super({});
+
+  void load(String userId) {
+    final json = _ref.read(hiveServiceProvider).getCommissionConfigsJson(userId);
+    if (json != null) {
+      try {
+        state = jsonDecode(json) as Map<String, dynamic>;
+        return;
+      } catch (_) {}
+    }
+    state = _defaults();
+  }
+
+  Map<String, dynamic> _defaults() => {
+    'aeps': const AepsCommissionConfig().toJson(),
+    'distributor': DistributorRange.defaults.map((r) => r.toJson()).toList(),
+    'settlement': SettlementRange.defaults.map((r) => r.toJson()).toList(),
+  };
+
+  Future<void> save(String userId) async {
+    final jsonStr = jsonEncode(state);
+    await _ref.read(hiveServiceProvider).saveCommissionConfigsJson(userId, jsonStr);
+    _ref.read(syncServiceProvider).pushCommissionConfigs(userId, state);
+  }
+
+  CommissionConfig getAccountConfig(String accountId) {
+    final data = state[accountId];
+    if (data != null) {
+      return CommissionConfig.fromJson(data as Map<String, dynamic>);
+    }
+    return const CommissionConfig();
+  }
+
+  AepsCommissionConfig getAepsConfig() {
+    final data = state['aeps'];
+    if (data != null) {
+      return AepsCommissionConfig.fromJson(data as Map<String, dynamic>);
+    }
+    return const AepsCommissionConfig();
+  }
+
+  List<DistributorRange> getDistributorRanges() {
+    final data = state['distributor'];
+    if (data != null) {
+      try {
+        return (data as List).map((j) => DistributorRange.fromJson(j as Map<String, dynamic>)).toList();
+      } catch (_) {}
+    }
+    return List.from(DistributorRange.defaults);
+  }
+
+  Future<void> setDistributorRanges(List<DistributorRange> ranges, String userId) async {
+    state = {...state, 'distributor': ranges.map((r) => r.toJson()).toList()};
+    await save(userId);
+  }
+
+  List<SettlementRange> getSettlementRanges() {
+    final data = state['settlement'];
+    if (data != null) {
+      try {
+        return (data as List).map((j) => SettlementRange.fromJson(j as Map<String, dynamic>)).toList();
+      } catch (_) {}
+    }
+    return List.from(SettlementRange.defaults);
+  }
+
+  Future<void> setSettlementRanges(List<SettlementRange> ranges, String userId) async {
+    state = {...state, 'settlement': ranges.map((r) => r.toJson()).toList()};
+    await save(userId);
+  }
+
+  Future<void> setAccountConfig(String accountId, CommissionConfig config, String userId) async {
+    state = {...state, accountId: config.toJson()};
+    await save(userId);
+  }
+
+  Future<void> setAepsConfig(AepsCommissionConfig config, String userId) async {
+    state = {...state, 'aeps': config.toJson()};
+    await save(userId);
   }
 }

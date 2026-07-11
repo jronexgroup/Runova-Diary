@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
+import '../models/bank_account.dart';
 import '../models/daily_balance.dart';
 import '../models/transaction.dart';
 import 'hive_service.dart';
@@ -96,6 +97,46 @@ class SyncService {
   Future<bool> isOnline() async {
     final result = await Connectivity().checkConnectivity();
     return result.any((r) => r != ConnectivityResult.none);
+  }
+
+  Future<void> pushAccounts(String userId, List<BankAccount> accounts) async {
+    try {
+      final data = {'accounts': accounts.map((a) => a.toJson()).toList()};
+      await _firebaseService.saveSettings(userId, 'accounts', data);
+    } catch (e) {
+      debugPrint('Push accounts failed: $e');
+    }
+  }
+
+  Future<List<BankAccount>> pullAccounts(String userId) async {
+    try {
+      final data = await _firebaseService.getSettings(userId, 'accounts');
+      if (data == null || data['accounts'] == null) return [];
+      return (data['accounts'] as List)
+          .map((j) => BankAccount.fromJson(j as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      debugPrint('Pull accounts failed: $e');
+      return [];
+    }
+  }
+
+  Future<void> pushCommissionConfigs(String userId, Map<String, dynamic> configs) async {
+    try {
+      await _firebaseService.saveSettings(userId, 'commissions', configs);
+    } catch (e) {
+      debugPrint('Push commission configs failed: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> pullCommissionConfigs(String userId) async {
+    try {
+      final data = await _firebaseService.getSettings(userId, 'commissions');
+      return data ?? {};
+    } catch (e) {
+      debugPrint('Pull commission configs failed: $e');
+      return {};
+    }
   }
 
   void dispose() {

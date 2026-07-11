@@ -12,6 +12,8 @@ import '../screens/edit_transaction_screen.dart';
 import '../screens/reports_screen.dart';
 import '../screens/settings_screen.dart';
 import '../screens/transaction_detail_screen.dart';
+import '../screens/bank_accounts_screen.dart';
+import '../screens/commission_settings_screen.dart';
 import '../utils/constants.dart';
 
 final _navigatorKey = GlobalKey<NavigatorState>();
@@ -91,6 +93,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/settings',
         builder: (_, __) => const SettingsScreen(),
+      ),
+      GoRoute(
+        path: '/bank-accounts',
+        builder: (_, __) => const BankAccountsScreen(),
+      ),
+      GoRoute(
+        path: '/commission-settings',
+        builder: (_, __) => const CommissionSettingsScreen(),
       ),
     ],
   );

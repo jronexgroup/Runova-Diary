@@ -27,7 +27,7 @@ class _EditTransactionScreenState extends ConsumerState<EditTransactionScreen> {
   final _bankNameController = TextEditingController();
   final _commissionController = TextEditingController();
 
-  PhonePeAccount? _selectedAccount;
+  String? _selectedAccountId;
   bool _loading = false;
   bool _commissionOverridden = false;
   bool _autoCommission = true;
@@ -55,7 +55,7 @@ class _EditTransactionScreenState extends ConsumerState<EditTransactionScreen> {
     _notesController.text = txn.notes ?? '';
     _bankNameController.text = txn.bankName ?? '';
     _commissionController.text = txn.commission.toStringAsFixed(2);
-    _selectedAccount = txn.phonePeAccount;
+    _selectedAccountId = txn.account ?? txn.phonePeAccount?.name;
     _commissionOverridden = txn.commissionOverridden;
   }
 
@@ -103,7 +103,8 @@ class _EditTransactionScreenState extends ConsumerState<EditTransactionScreen> {
         ? (double.tryParse(_commissionController.text.trim()) ?? 0.0)
         : (_autoCommission ? (_calculatedCommission ?? 0.0) : 0.0);
     final distributorComm = (_original!.type == TransactionType.aeps && !_commissionOverridden)
-        ? ref.read(commissionServiceProvider).getDistributorCommission(amount)
+        ? ref.read(commissionServiceProvider).getDistributorCommission(amount,
+            ranges: ref.read(commissionConfigsProvider.notifier).getDistributorRanges())
         : _original!.distributorCommission;
 
     final updated = _original!.copyWith(
@@ -127,7 +128,8 @@ class _EditTransactionScreenState extends ConsumerState<EditTransactionScreen> {
       bankName: _bankNameController.text.trim().isEmpty
           ? null
           : _bankNameController.text.trim(),
-      phonePeAccount: _selectedAccount,
+      phonePeAccount: null,
+      account: _selectedAccountId,
       signatureData: _signatureNotifier.value,
     );
 
@@ -162,6 +164,7 @@ class _EditTransactionScreenState extends ConsumerState<EditTransactionScreen> {
     final isPhonePe = _original!.type == TransactionType.cashIn ||
         _original!.type == TransactionType.cashOut;
     final isAEPS = _original!.type == TransactionType.aeps;
+    final accounts = ref.watch(accountsProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Edit Transaction')),
@@ -210,16 +213,17 @@ class _EditTransactionScreenState extends ConsumerState<EditTransactionScreen> {
               if (isPhonePe) ...[
                 Text('PhonePe Account *', style: theme.textTheme.labelLarge),
                 const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _accountToggle(PhonePeAccount.hasibul),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _accountToggle(PhonePeAccount.runaLaila),
-                    ),
-                  ],
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: accounts.map((acc) {
+                    final selected = _selectedAccountId == acc.id;
+                    return ChoiceChip(
+                      label: Text(acc.name),
+                      selected: selected,
+                      onSelected: (v) => setState(() => _selectedAccountId = v ? acc.id : null),
+                    );
+                  }).toList(),
                 ),
                 const SizedBox(height: 16),
               ],
@@ -358,51 +362,6 @@ class _EditTransactionScreenState extends ConsumerState<EditTransactionScreen> {
               const SizedBox(height: 16),
             ],
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _accountToggle(PhonePeAccount account) {
-    final selected = _selectedAccount == account;
-    return GestureDetector(
-      onTap: () => setState(() => _selectedAccount = account),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
-        decoration: BoxDecoration(
-          color: selected
-              ? Theme.of(context).colorScheme.primaryContainer
-              : Theme.of(context).colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: selected
-                ? Theme.of(context).colorScheme.primary
-                : Colors.transparent,
-            width: 2,
-          ),
-        ),
-        child: Column(
-          children: [
-            Icon(
-              Icons.phone_android,
-              color: selected
-                  ? Theme.of(context).colorScheme.primary
-                  : Theme.of(context).colorScheme.onSurfaceVariant,
-              size: 28,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              account.displayName,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontWeight: selected ? FontWeight.bold : FontWeight.normal,
-                color: selected
-                    ? Theme.of(context).colorScheme.primary
-                    : null,
-              ),
-            ),
-          ],
         ),
       ),
     );

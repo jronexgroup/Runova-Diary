@@ -14,6 +14,7 @@ class DailyBalance {
   final double hasibulClosingBalance;
   final double runaLailaOpeningBalance;
   final double runaLailaClosingBalance;
+  final Map<String, double> customBalances;
   final bool openingBalancesEditable;
 
   const DailyBalance({
@@ -26,14 +27,53 @@ class DailyBalance {
     required this.hasibulClosingBalance,
     required this.runaLailaOpeningBalance,
     required this.runaLailaClosingBalance,
+    this.customBalances = const {},
     this.openingBalancesEditable = true,
   });
 
-  double get totalClosingBalance =>
-      aepsClosingBalance + hasibulClosingBalance + runaLailaClosingBalance;
+  double getBalance(String accountId, {bool closing = true}) {
+    switch (accountId) {
+      case 'aeps':
+        return closing ? aepsClosingBalance : aepsOpeningBalance;
+      case 'hasibul':
+        return closing ? hasibulClosingBalance : hasibulOpeningBalance;
+      case 'runaLaila':
+        return closing ? runaLailaClosingBalance : runaLailaOpeningBalance;
+      default:
+        return customBalances[accountId] ?? 0;
+    }
+  }
 
-  double get totalOpeningBalance =>
-      aepsOpeningBalance + hasibulOpeningBalance + runaLailaOpeningBalance;
+  DailyBalance setBalance(String accountId, double amount) {
+    switch (accountId) {
+      case 'aeps':
+        return copyWith(aepsClosingBalance: amount);
+      case 'hasibul':
+        return copyWith(hasibulClosingBalance: amount);
+      case 'runaLaila':
+        return copyWith(runaLailaClosingBalance: amount);
+      default:
+        final newMap = Map<String, double>.from(customBalances);
+        newMap[accountId] = amount;
+        return copyWith(customBalances: newMap);
+    }
+  }
+
+  double get totalClosingBalance {
+    var total = aepsClosingBalance + hasibulClosingBalance + runaLailaClosingBalance;
+    for (final v in customBalances.values) {
+      total += v;
+    }
+    return total;
+  }
+
+  double get totalOpeningBalance {
+    var total = aepsOpeningBalance + hasibulOpeningBalance + runaLailaOpeningBalance;
+    for (final v in customBalances.values) {
+      total += v;
+    }
+    return total;
+  }
 
   DailyBalance copyWith({
     String? id,
@@ -45,6 +85,7 @@ class DailyBalance {
     double? hasibulClosingBalance,
     double? runaLailaOpeningBalance,
     double? runaLailaClosingBalance,
+    Map<String, double>? customBalances,
     bool? openingBalancesEditable,
   }) {
     return DailyBalance(
@@ -57,6 +98,7 @@ class DailyBalance {
       hasibulClosingBalance: hasibulClosingBalance ?? this.hasibulClosingBalance,
       runaLailaOpeningBalance: runaLailaOpeningBalance ?? this.runaLailaOpeningBalance,
       runaLailaClosingBalance: runaLailaClosingBalance ?? this.runaLailaClosingBalance,
+      customBalances: customBalances ?? this.customBalances,
       openingBalancesEditable: openingBalancesEditable ?? this.openingBalancesEditable,
     );
   }
@@ -71,6 +113,7 @@ class DailyBalance {
     'hasibulClosingBalance': hasibulClosingBalance,
     'runaLailaOpeningBalance': runaLailaOpeningBalance,
     'runaLailaClosingBalance': runaLailaClosingBalance,
+    if (customBalances.isNotEmpty) 'customBalances': customBalances,
     'openingBalancesEditable': openingBalancesEditable,
   };
 
@@ -85,6 +128,10 @@ class DailyBalance {
       hasibulClosingBalance: (json['hasibulClosingBalance'] as num).toDouble(),
       runaLailaOpeningBalance: (json['runaLailaOpeningBalance'] as num).toDouble(),
       runaLailaClosingBalance: (json['runaLailaClosingBalance'] as num).toDouble(),
+      customBalances: json['customBalances'] != null
+          ? (json['customBalances'] as Map<String, dynamic>).map(
+              (k, v) => MapEntry(k, (v as num).toDouble()))
+          : {},
       openingBalancesEditable: json['openingBalancesEditable'] as bool? ?? true,
     );
   }
@@ -95,6 +142,7 @@ class DailyBalance {
     double aepsOpeningBalance = 0,
     double hasibulOpeningBalance = 0,
     double runaLailaOpeningBalance = 0,
+    Map<String, double> customOpening = const {},
   }) {
     return DailyBalance(
       id: _uuid.v4(),
@@ -106,6 +154,7 @@ class DailyBalance {
       hasibulClosingBalance: hasibulOpeningBalance,
       runaLailaOpeningBalance: runaLailaOpeningBalance,
       runaLailaClosingBalance: runaLailaOpeningBalance,
+      customBalances: Map.from(customOpening),
     );
   }
 }

@@ -148,4 +148,32 @@ class FirebaseService {
       return [];
     }
   }
+
+  Future<void> saveSettings(String userId, String key, Map<String, dynamic> data) async {
+    try {
+      await _firestore
+          .collection(AppConstants.usersCollection)
+          .doc(userId)
+          .collection(AppConstants.settingsCollection)
+          .doc(key)
+          .set(data, SetOptions(merge: true));
+    } catch (e) {
+      debugPrint('Firebase saveSettings error: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>?> getSettings(String userId, String key) async {
+    try {
+      final doc = await _firestore
+          .collection(AppConstants.usersCollection)
+          .doc(userId)
+          .collection(AppConstants.settingsCollection)
+          .doc(key)
+          .get();
+      return doc.data();
+    } catch (e) {
+      debugPrint('Firebase getSettings error: $e');
+      return null;
+    }
+  }
 }

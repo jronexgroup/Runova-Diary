@@ -18,6 +18,7 @@ class HiveService {
   Box get _txBox => Hive.box(AppConstants.hiveTransactionsBox);
   Box get _balBox => Hive.box(AppConstants.hiveBalancesBox);
   Box get _userBox => Hive.box(AppConstants.hiveUserBox);
+  Box get _settingsBox => Hive.box(AppConstants.hiveSettingsBox);
 
   Future<void> saveUser(AppUser user) async {
     await _userBox.put('current', jsonEncode(user.toJson()));
@@ -102,5 +103,21 @@ class HiveService {
     }
     balances.sort((a, b) => b.dateKey.compareTo(a.dateKey));
     return balances;
+  }
+
+  Future<void> saveAccountsJson(String userId, String jsonStr) async {
+    await _settingsBox.put('${userId}_accounts', jsonStr);
+  }
+
+  String? getAccountsJson(String userId) {
+    return _settingsBox.get('${userId}_accounts') as String?;
+  }
+
+  Future<void> saveCommissionConfigsJson(String userId, String jsonStr) async {
+    await _settingsBox.put('${userId}_commissions', jsonStr);
+  }
+
+  String? getCommissionConfigsJson(String userId) {
+    return _settingsBox.get('${userId}_commissions') as String?;
   }
 }

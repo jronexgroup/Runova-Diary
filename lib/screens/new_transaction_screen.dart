@@ -26,7 +26,7 @@ class _NewTransactionScreenState extends ConsumerState<NewTransactionScreen> {
   final _bankNameController = TextEditingController();
   final _commissionController = TextEditingController();
 
-  PhonePeAccount? _selectedAccount;
+  String? _selectedAccountId;
   bool _loading = false;
   bool _commissionOverridden = false;
   bool _autoCommission = true;
@@ -76,19 +76,16 @@ class _NewTransactionScreenState extends ConsumerState<NewTransactionScreen> {
 
     double newBalance;
     final distributorComm = widget.type == TransactionType.aeps
-        ? ref.read(commissionServiceProvider).getDistributorCommission(amount)
+        ? ref.read(commissionServiceProvider).getDistributorCommission(amount,
+            ranges: ref.read(commissionConfigsProvider.notifier).getDistributorRanges())
         : 0.0;
     if (widget.type == TransactionType.aeps) {
       newBalance = (todayBalance?.aepsOpeningBalance ?? 0) + amount + distributorComm;
     } else if (widget.type == TransactionType.cashIn) {
-      final currentBal = _selectedAccount == PhonePeAccount.hasibul
-          ? (todayBalance?.hasibulClosingBalance ?? todayBalance?.hasibulOpeningBalance ?? 0)
-          : (todayBalance?.runaLailaClosingBalance ?? todayBalance?.runaLailaOpeningBalance ?? 0);
+      final currentBal = todayBalance?.getBalance(_selectedAccountId ?? '') ?? 0;
       newBalance = currentBal + amount;
     } else {
-      final currentBal = _selectedAccount == PhonePeAccount.hasibul
-          ? (todayBalance?.hasibulClosingBalance ?? todayBalance?.hasibulOpeningBalance ?? 0)
-          : (todayBalance?.runaLailaClosingBalance ?? todayBalance?.runaLailaOpeningBalance ?? 0);
+      final currentBal = todayBalance?.getBalance(_selectedAccountId ?? '') ?? 0;
       if (currentBal < amount) {
         if (!mounted) return;
         setState(() => _loading = false);
@@ -121,7 +118,8 @@ class _NewTransactionScreenState extends ConsumerState<NewTransactionScreen> {
             ? null : _notesController.text.trim(),
         bankName: _bankNameController.text.trim().isEmpty
             ? null : _bankNameController.text.trim(),
-        phonePeAccount: _selectedAccount,
+        phonePeAccount: null,
+        account: _selectedAccountId,
         commission: commission,
         commissionOverridden: _commissionOverridden,
         distributorCommission: distributorComm,
@@ -165,19 +163,16 @@ class _NewTransactionScreenState extends ConsumerState<NewTransactionScreen> {
     final todayBalance = ref.read(balancesProvider)[todayKey];
 
     if (widget.type == TransactionType.aeps) {
-      final distributorComm = ref.read(commissionServiceProvider).getDistributorCommission(amount);
+      final distributorComm = ref.read(commissionServiceProvider).getDistributorCommission(amount,
+          ranges: ref.read(commissionConfigsProvider.notifier).getDistributorRanges());
       return (todayBalance?.aepsClosingBalance ?? todayBalance?.aepsOpeningBalance ?? 0) + amount + distributorComm;
     } else if (widget.type == TransactionType.cashIn) {
-      if (_selectedAccount == null) return null;
-      final currentBal = _selectedAccount == PhonePeAccount.hasibul
-          ? (todayBalance?.hasibulClosingBalance ?? todayBalance?.hasibulOpeningBalance ?? 0)
-          : (todayBalance?.runaLailaClosingBalance ?? todayBalance?.runaLailaOpeningBalance ?? 0);
+      if (_selectedAccountId == null) return null;
+      final currentBal = todayBalance?.getBalance(_selectedAccountId!) ?? 0;
       return currentBal + amount;
     } else {
-      if (_selectedAccount == null) return null;
-      final currentBal = _selectedAccount == PhonePeAccount.hasibul
-          ? (todayBalance?.hasibulClosingBalance ?? todayBalance?.hasibulOpeningBalance ?? 0)
-          : (todayBalance?.runaLailaClosingBalance ?? todayBalance?.runaLailaOpeningBalance ?? 0);
+      if (_selectedAccountId == null) return null;
+      final currentBal = todayBalance?.getBalance(_selectedAccountId!) ?? 0;
       return currentBal - amount;
     }
   }
@@ -188,6 +183,7 @@ class _NewTransactionScreenState extends ConsumerState<NewTransactionScreen> {
     final isPhonePe = widget.type == TransactionType.cashIn ||
         widget.type == TransactionType.cashOut;
     final isAEPS = widget.type == TransactionType.aeps;
+    final accounts = ref.watch(accountsProvider);
     final projectedBalance = _newBalance;
     final insufficient = widget.type == TransactionType.cashOut &&
         projectedBalance != null && projectedBalance < 0;
@@ -237,34 +233,59 @@ class _NewTransactionScreenState extends ConsumerState<NewTransactionScreen> {
               ),
               const SizedBox(height: 16),
               if (isPhonePe) ...[
-                Text('PhonePe Account *', style: theme.textTheme.labelLarge),
+                Text('Select Account *', style: theme.textTheme.labelLarge),
                 const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _accountToggle(PhonePeAccount.hasibul),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _accountToggle(PhonePeAccount.runaLaila),
-                    ),
-                  ],
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: accounts.map((acc) {
+                    final selected = _selectedAccountId == acc.id;
+                    return ChoiceChip(
+                      label: Text(acc.name),
+                      selected: selected,
+                      onSelected: (v) => setState(() => _selectedAccountId = v ? acc.id : null),
+                    );
+                  }).toList(),
                 ),
                 const SizedBox(height: 16),
               ],
               if (isAEPS) ...[
-                TextFormField(
-                  controller: _aadhaarController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Aadhaar Number *',
-                    prefixIcon: Icon(Icons.credit_card),
+                Card(
+                  color: theme.colorScheme.surfaceContainerHighest,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.fingerprint, color: theme.colorScheme.primary),
+                            const SizedBox(width: 8),
+                            Text('AEPS Transaction', style: theme.textTheme.titleSmall?.copyWith(
+                              color: theme.colorScheme.primary,
+                              fontWeight: FontWeight.bold,
+                            )),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: _aadhaarController,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(
+                            labelText: 'Aadhaar Number *',
+                            prefixIcon: Icon(Icons.credit_card),
+                          ),
+                          validator: (v) {
+                            if (v?.trim().isEmpty ?? true) return 'Aadhaar number required';
+                            if (v!.trim().length < 12) return 'Aadhaar must be 12 digits';
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        SignaturePad(notifier: _signatureNotifier),
+                      ],
+                    ),
                   ),
-                  validator: (v) {
-                    if (v?.trim().isEmpty ?? true) return 'Aadhaar number required';
-                    if (v!.trim().length < 12) return 'Aadhaar must be 12 digits';
-                    return null;
-                  },
                 ),
                 const SizedBox(height: 16),
               ],
@@ -417,51 +438,6 @@ class _NewTransactionScreenState extends ConsumerState<NewTransactionScreen> {
               const SizedBox(height: 16),
             ],
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _accountToggle(PhonePeAccount account) {
-    final selected = _selectedAccount == account;
-    return GestureDetector(
-      onTap: () => setState(() => _selectedAccount = account),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
-        decoration: BoxDecoration(
-          color: selected
-              ? Theme.of(context).colorScheme.primaryContainer
-              : Theme.of(context).colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: selected
-                ? Theme.of(context).colorScheme.primary
-                : Colors.transparent,
-            width: 2,
-          ),
-        ),
-        child: Column(
-          children: [
-            Icon(
-              Icons.phone_android,
-              color: selected
-                  ? Theme.of(context).colorScheme.primary
-                  : Theme.of(context).colorScheme.onSurfaceVariant,
-              size: 28,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              account.displayName,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontWeight: selected ? FontWeight.bold : FontWeight.normal,
-                color: selected
-                    ? Theme.of(context).colorScheme.primary
-                    : null,
-              ),
-            ),
-          ],
         ),
       ),
     );

@@ -139,6 +139,32 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
           ),
           const SizedBox(height: 24),
+          Text('Accounts', style: theme.textTheme.titleMedium?.copyWith(
+            color: theme.colorScheme.primary,
+          )),
+          const SizedBox(height: 8),
+          Card(
+            child: Column(
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.account_balance, color: Colors.teal),
+                  title: const Text('Bank Accounts'),
+                  subtitle: Text('${ref.watch(accountsProvider).length} account(s)'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => context.push('/bank-accounts'),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.tune, color: Colors.deepPurple),
+                  title: const Text('Commission Settings'),
+                  subtitle: const Text('Customize AEPS & account commissions'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => context.push('/commission-settings'),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
           Text('About', style: theme.textTheme.titleMedium?.copyWith(
             color: theme.colorScheme.primary,
           )),
@@ -395,7 +421,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           if (fromAccount == 'aeps') {
             final amt = double.tryParse(amountCtrl.text);
             if (amt != null && amt > 0) {
-              charge = ref.read(commissionServiceProvider).getSettlementCharge(amt);
+              charge = ref.read(commissionServiceProvider).getSettlementCharge(amt,
+                  ranges: ref.read(commissionConfigsProvider.notifier).getSettlementRanges());
             }
           }
           return AlertDialog(
@@ -569,7 +596,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
                   final amount = double.parse(amountCtrl.text.trim());
                   final settlementCharge = fromAccount == 'aeps'
-                      ? ref.read(commissionServiceProvider).getSettlementCharge(amount)
+                      ? ref.read(commissionServiceProvider).getSettlementCharge(amount,
+                          ranges: ref.read(commissionConfigsProvider.notifier).getSettlementRanges())
                       : 0.0;
                   final accountLabels = {'aeps': 'AEPS', 'hasibul': 'Hasibul', 'runaLaila': 'Runa Laila'};
 
