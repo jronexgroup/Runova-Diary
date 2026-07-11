@@ -48,6 +48,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     final theme = Theme.of(context);
     final allTransactions = ref.watch(transactionsProvider);
     final balances = ref.watch(balancesProvider);
+    final accounts = ref.watch(accountsProvider);
 
     final filtered = _filtered(allTransactions);
 
@@ -166,11 +167,19 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                   _reportRow('AEPS Balance',
                       '₹${(dayBalance?.aepsClosingBalance ?? 0).toStringAsFixed(2)}'),
                   const Divider(),
-                  _reportRow('Hasibul PhonePe',
-                      '₹${(dayBalance?.hasibulClosingBalance ?? 0).toStringAsFixed(2)}'),
-                  const Divider(),
-                  _reportRow('Runa Laila PhonePe',
-                      '₹${(dayBalance?.runaLailaClosingBalance ?? 0).toStringAsFixed(2)}'),
+                  ...accounts.map((acc) {
+                    final bal = acc.id == 'hasibul'
+                        ? (dayBalance?.hasibulClosingBalance ?? 0)
+                        : acc.id == 'runaLaila'
+                            ? (dayBalance?.runaLailaClosingBalance ?? 0)
+                            : (dayBalance?.customBalances[acc.id] ?? 0);
+                    return Column(
+                      children: [
+                        _reportRow(acc.name, '₹${bal.toStringAsFixed(2)}'),
+                        const Divider(),
+                      ],
+                    );
+                  }),
                 ],
               ),
             ),

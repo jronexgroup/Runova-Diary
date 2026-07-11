@@ -14,6 +14,9 @@ import '../screens/settings_screen.dart';
 import '../screens/transaction_detail_screen.dart';
 import '../screens/bank_accounts_screen.dart';
 import '../screens/commission_settings_screen.dart';
+import '../screens/change_pin_screen.dart';
+import '../screens/adjust_balance_screen.dart';
+import '../screens/self_transfer_screen.dart';
 import '../utils/constants.dart';
 
 final _navigatorKey = GlobalKey<NavigatorState>();
@@ -101,6 +104,21 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/commission-settings',
         builder: (_, __) => const CommissionSettingsScreen(),
+      ),
+      GoRoute(
+        path: '/change-pin',
+        builder: (_, __) => const ChangePinScreen(),
+      ),
+      GoRoute(
+        path: '/adjust-balance/:isAdd',
+        builder: (_, state) {
+          final isAdd = state.pathParameters['isAdd'] == 'true';
+          return AdjustBalanceScreen(isAdd: isAdd);
+        },
+      ),
+      GoRoute(
+        path: '/self-transfer',
+        builder: (_, __) => const SelfTransferScreen(),
       ),
     ],
   );

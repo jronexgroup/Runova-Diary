@@ -66,6 +66,7 @@ class BankAccount {
   }
 
   static BankAccount create({
+    String? id,
     required String name,
     required String holderName,
     required String bankName,
@@ -74,7 +75,7 @@ class BankAccount {
     bool isActive = true,
   }) {
     return BankAccount(
-      id: _uuid.v4(),
+      id: id ?? _uuid.v4(),
       name: name,
       holderName: holderName,
       bankName: bankName,

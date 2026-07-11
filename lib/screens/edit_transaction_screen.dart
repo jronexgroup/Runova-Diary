@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 import '../models/transaction.dart';
 import '../providers/providers.dart';
 import '../utils/constants.dart';
-import '../widgets/signature_pad.dart';
 
 class EditTransactionScreen extends ConsumerStatefulWidget {
   final String transactionId;
@@ -32,7 +31,6 @@ class _EditTransactionScreenState extends ConsumerState<EditTransactionScreen> {
   bool _commissionOverridden = false;
   bool _autoCommission = true;
   Transaction? _original;
-  final _signatureNotifier = ValueNotifier<String?>(null);
 
   @override
   void initState() {
@@ -46,7 +44,6 @@ class _EditTransactionScreenState extends ConsumerState<EditTransactionScreen> {
     if (txn == null) return;
 
     _original = txn;
-    _signatureNotifier.value = txn.signatureData;
     _customerNameController.text = txn.customerName;
     _amountController.text = txn.amount.toStringAsFixed(2);
     _aadhaarController.text = txn.aadhaarNumber ?? '';
@@ -130,7 +127,6 @@ class _EditTransactionScreenState extends ConsumerState<EditTransactionScreen> {
           : _bankNameController.text.trim(),
       phonePeAccount: null,
       account: _selectedAccountId,
-      signatureData: _signatureNotifier.value,
     );
 
     try {
@@ -270,10 +266,6 @@ class _EditTransactionScreenState extends ConsumerState<EditTransactionScreen> {
                 onChanged: (_) => setState(() {}),
               ),
               const SizedBox(height: 16),
-              if (isAEPS) ...[
-                SignaturePad(notifier: _signatureNotifier, initialData: _original?.signatureData),
-                const SizedBox(height: 16),
-              ],
               TextFormField(
                 controller: _mobileController,
                 keyboardType: TextInputType.phone,

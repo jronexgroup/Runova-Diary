@@ -28,6 +28,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
     ref.read(transactionsProvider.notifier).loadTransactions(user.id);
     ref.read(balancesProvider.notifier).loadBalances(user.id);
+    ref.read(accountsProvider.notifier).load(user.id);
+    ref.read(commissionConfigsProvider.notifier).load(user.id);
     _ensureTodayBalance(user.id);
   }
 
@@ -43,6 +45,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final user = ref.watch(authProvider);
     final transactions = ref.watch(transactionsProvider);
     final balances = ref.watch(balancesProvider);
+    final accounts = ref.watch(accountsProvider);
 
     final todayKey = DateTime.now().dateKey;
     final todayBalance = balances[todayKey];
@@ -130,20 +133,25 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 icon: Icons.account_balance,
                 color: theme.colorScheme.primary,
               ),
-              BalanceCard(
-                label: 'Hasibul PhonePe',
-                opening: todayBalance?.hasibulOpeningBalance ?? 0,
-                closing: todayBalance?.hasibulClosingBalance ?? 0,
-                icon: Icons.phone_android,
-                color: Colors.blue,
-              ),
-              BalanceCard(
-                label: 'Runa Laila PhonePe',
-                opening: todayBalance?.runaLailaOpeningBalance ?? 0,
-                closing: todayBalance?.runaLailaClosingBalance ?? 0,
-                icon: Icons.phone_android,
-                color: Colors.purple,
-              ),
+              ...accounts.map((acc) {
+                final open = acc.id == 'hasibul'
+                    ? (todayBalance?.hasibulOpeningBalance ?? 0)
+                    : acc.id == 'runaLaila'
+                        ? (todayBalance?.runaLailaOpeningBalance ?? 0)
+                        : (todayBalance?.customBalances[acc.id] ?? 0);
+                final close = acc.id == 'hasibul'
+                    ? (todayBalance?.hasibulClosingBalance ?? 0)
+                    : acc.id == 'runaLaila'
+                        ? (todayBalance?.runaLailaClosingBalance ?? 0)
+                        : (todayBalance?.customBalances[acc.id] ?? 0);
+                return BalanceCard(
+                  label: acc.name,
+                  opening: open,
+                  closing: close,
+                  icon: Icons.phone_android,
+                  color: Colors.blue,
+                );
+              }),
               const SizedBox(height: 16),
               Text('Quick Actions', style: theme.textTheme.titleLarge),
               const SizedBox(height: 8),

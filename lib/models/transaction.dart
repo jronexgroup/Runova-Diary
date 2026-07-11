@@ -22,7 +22,6 @@ class Transaction {
   final double balanceAfterTransaction;
   final DateTime createdAt;
   final String userId;
-  final String? signatureData;
   final String? account;
   final String? fromAccount;
   final String? toAccount;
@@ -44,7 +43,6 @@ class Transaction {
     this.notes,
     this.bankName,
     this.phonePeAccount,
-    this.signatureData,
     this.account,
     this.fromAccount,
     this.toAccount,
@@ -67,7 +65,6 @@ class Transaction {
     double? balanceAfterTransaction,
     DateTime? createdAt,
     String? userId,
-    String? signatureData,
     String? account,
     String? fromAccount,
     String? toAccount,
@@ -89,7 +86,6 @@ class Transaction {
       balanceAfterTransaction: balanceAfterTransaction ?? this.balanceAfterTransaction,
       createdAt: createdAt ?? this.createdAt,
       userId: userId ?? this.userId,
-      signatureData: signatureData ?? this.signatureData,
       account: account ?? this.account,
       fromAccount: fromAccount ?? this.fromAccount,
       toAccount: toAccount ?? this.toAccount,
@@ -113,7 +109,6 @@ class Transaction {
     'balanceAfterTransaction': balanceAfterTransaction,
     'createdAt': createdAt.toIso8601String(),
     'userId': userId,
-    'signatureData': signatureData,
     'account': account,
     'fromAccount': fromAccount,
     'toAccount': toAccount,
@@ -139,7 +134,6 @@ class Transaction {
       balanceAfterTransaction: (json['balanceAfterTransaction'] as num).toDouble(),
       createdAt: DateTime.parse(json['createdAt'] as String),
       userId: json['userId'] as String,
-      signatureData: json['signatureData'] as String?,
       account: json['account'] as String?,
       fromAccount: json['fromAccount'] as String?,
       toAccount: json['toAccount'] as String?,
@@ -161,7 +155,6 @@ class Transaction {
     double? commission,
     double? distributorCommission,
     bool commissionOverridden = false,
-    String? signatureData,
     String? account,
     String? fromAccount,
     String? toAccount,
@@ -185,7 +178,6 @@ class Transaction {
       notes: notes,
       bankName: bankName,
       phonePeAccount: phonePeAccount,
-      signatureData: signatureData,
       account: account,
       fromAccount: fromAccount,
       toAccount: toAccount,

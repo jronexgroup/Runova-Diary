@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 import '../providers/providers.dart';
 import '../utils/constants.dart';
 import '../utils/date_utils.dart';
-import '../widgets/signature_pad.dart';
 
 class NewTransactionScreen extends ConsumerStatefulWidget {
   final TransactionType type;
@@ -30,7 +29,6 @@ class _NewTransactionScreenState extends ConsumerState<NewTransactionScreen> {
   bool _loading = false;
   bool _commissionOverridden = false;
   bool _autoCommission = true;
-  final _signatureNotifier = ValueNotifier<String?>(null);
 
   @override
   void dispose() {
@@ -42,7 +40,6 @@ class _NewTransactionScreenState extends ConsumerState<NewTransactionScreen> {
     _notesController.dispose();
     _bankNameController.dispose();
     _commissionController.dispose();
-    _signatureNotifier.dispose();
     super.dispose();
   }
 
@@ -123,7 +120,6 @@ class _NewTransactionScreenState extends ConsumerState<NewTransactionScreen> {
         commission: commission,
         commissionOverridden: _commissionOverridden,
         distributorCommission: distributorComm,
-        signatureData: _signatureNotifier.value,
       );
 
       if (!mounted) return;
@@ -281,8 +277,6 @@ class _NewTransactionScreenState extends ConsumerState<NewTransactionScreen> {
                             return null;
                           },
                         ),
-                        const SizedBox(height: 16),
-                        SignaturePad(notifier: _signatureNotifier),
                       ],
                     ),
                   ),
@@ -344,11 +338,6 @@ class _NewTransactionScreenState extends ConsumerState<NewTransactionScreen> {
                   'Insufficient balance!',
                   style: theme.textTheme.bodySmall?.copyWith(color: Colors.red),
                 ),
-              ],
-              const SizedBox(height: 16),
-              if (isAEPS) ...[
-                SignaturePad(notifier: _signatureNotifier),
-                const SizedBox(height: 16),
               ],
               TextFormField(
                 controller: _mobileController,
@@ -435,7 +424,6 @@ class _NewTransactionScreenState extends ConsumerState<NewTransactionScreen> {
                       )
                     : Text('Save ${widget.type.displayName}'),
               ),
-              const SizedBox(height: 16),
             ],
           ),
         ),

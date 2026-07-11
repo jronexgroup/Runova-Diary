@@ -70,6 +70,8 @@ class AuthNotifier extends StateNotifier<AppUser?> {
       await sync.syncFromFirebase();
       _ref.read(transactionsProvider.notifier).loadTransactions(user.id);
       _ref.read(balancesProvider.notifier).loadBalances(user.id);
+      _ref.read(accountsProvider.notifier).load(user.id);
+      _ref.read(commissionConfigsProvider.notifier).load(user.id);
     }
     return user != null;
   }
@@ -116,7 +118,6 @@ class TransactionsNotifier extends StateNotifier<List<Transaction>> {
     PhonePeAccount? phonePeAccount,
     double? commission,
     bool commissionOverridden = false,
-    String? signatureData,
     String? account,
     String? fromAccount,
     String? toAccount,
@@ -136,7 +137,6 @@ class TransactionsNotifier extends StateNotifier<List<Transaction>> {
       phonePeAccount: phonePeAccount,
       commission: commission,
       commissionOverridden: commissionOverridden,
-      signatureData: signatureData,
       account: account,
       fromAccount: fromAccount,
       toAccount: toAccount,
@@ -242,6 +242,7 @@ class BalancesNotifier extends StateNotifier<Map<String, DailyBalance>> {
         .subtract(const Duration(days: 1))
         .dateKey;
     final yesterday = state[yesterdayKey] ?? hive.getBalance(userId, yesterdayKey);
+    final yesterdayCustom = yesterday?.customBalances ?? {};
 
     final balance = DailyBalance.create(
       dateKey: dateKey,
@@ -249,6 +250,7 @@ class BalancesNotifier extends StateNotifier<Map<String, DailyBalance>> {
       aepsOpeningBalance: yesterday?.aepsClosingBalance ?? aepsOpening,
       hasibulOpeningBalance: yesterday?.hasibulClosingBalance ?? hasibulOpening,
       runaLailaOpeningBalance: yesterday?.runaLailaClosingBalance ?? runaLailaOpening,
+      customOpening: yesterdayCustom,
     );
     await hive.saveBalance(balance);
     _ref.read(syncServiceProvider).pushBalance(balance);
@@ -364,8 +366,8 @@ class AccountsNotifier extends StateNotifier<List<BankAccount>> {
   }
 
   List<BankAccount> _defaultAccounts() => [
-    BankAccount.create(name: 'Hasibul', holderName: '', bankName: 'PhonePe'),
-    BankAccount.create(name: 'Runa Laila', holderName: '', bankName: 'PhonePe'),
+    BankAccount.create(id: 'hasibul', name: 'Hasibul', holderName: '', bankName: 'PhonePe'),
+    BankAccount.create(id: 'runaLaila', name: 'Runa Laila', holderName: '', bankName: 'PhonePe'),
   ];
 
   Future<void> save(String userId) async {
