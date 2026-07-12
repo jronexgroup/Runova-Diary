@@ -27,6 +27,15 @@ class _NewTransactionScreenState extends ConsumerState<NewTransactionScreen> {
   final _bankNameController = TextEditingController();
   final _commissionController = TextEditingController();
 
+  final _customerNameFocus = FocusNode();
+  final _amountFocus = FocusNode();
+  final _aadhaarFocus = FocusNode();
+  final _mobileFocus = FocusNode();
+  final _txnIdFocus = FocusNode();
+  final _notesFocus = FocusNode();
+  final _bankNameFocus = FocusNode();
+  final _commissionFocus = FocusNode();
+
   String? _selectedAccountId;
   bool _loading = false;
   bool _commissionOverridden = false;
@@ -42,6 +51,14 @@ class _NewTransactionScreenState extends ConsumerState<NewTransactionScreen> {
     _notesController.dispose();
     _bankNameController.dispose();
     _commissionController.dispose();
+    _customerNameFocus.dispose();
+    _amountFocus.dispose();
+    _aadhaarFocus.dispose();
+    _mobileFocus.dispose();
+    _txnIdFocus.dispose();
+    _notesFocus.dispose();
+    _bankNameFocus.dispose();
+    _commissionFocus.dispose();
     super.dispose();
   }
 
@@ -287,241 +304,259 @@ class _NewTransactionScreenState extends ConsumerState<NewTransactionScreen> {
           ),
           child: Form(
             key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-              if (_hasDetectedCommission) ...[
+            child: FocusTraversalGroup(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                if (_hasDetectedCommission) ...[
+                  Card(
+                    color: theme.colorScheme.primaryContainer,
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Row(
+                        children: [
+                          Icon(Icons.lightbulb, color: theme.colorScheme.onPrimaryContainer),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Detected: \u20B9${(_calculatedCommission!).toStringAsFixed(2)} commission included',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: theme.colorScheme.onPrimaryContainer,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                TextFormField(
+                  controller: _customerNameController,
+                  focusNode: _customerNameFocus,
+                  textInputAction: TextInputAction.next,
+                  decoration: const InputDecoration(
+                    labelText: 'Customer Name *',
+                    prefixIcon: Icon(Icons.person),
+                  ),
+                  textCapitalization: TextCapitalization.words,
+                  validator: (v) =>
+                      v?.trim().isEmpty ?? true ? 'Customer name required' : null,
+                ),
+                const SizedBox(height: 16),
+                if (isPhonePe) ...[
+                  Text('Select Account *', style: theme.textTheme.labelLarge),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: accounts.map((acc) {
+                      final selected = _selectedAccountId == acc.id;
+                      return ChoiceChip(
+                        label: Text(acc.name),
+                        selected: selected,
+                        onSelected: (v) => setState(() => _selectedAccountId = v ? acc.id : null),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+                if (isAEPS) ...[
+                  Card(
+                    color: theme.colorScheme.surfaceContainerHighest,
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.fingerprint, color: theme.colorScheme.primary),
+                              const SizedBox(width: 8),
+                              Text('AEPS Transaction', style: theme.textTheme.titleSmall?.copyWith(
+                                color: theme.colorScheme.primary,
+                                fontWeight: FontWeight.bold,
+                              )),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: _aadhaarController,
+                            focusNode: _aadhaarFocus,
+                            textInputAction: TextInputAction.next,
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(
+                              labelText: 'Aadhaar Number *',
+                              prefixIcon: Icon(Icons.credit_card),
+                            ),
+                            validator: (v) {
+                              if (v?.trim().isEmpty ?? true) return 'Aadhaar number required';
+                              if (v!.trim().length < 12) return 'Aadhaar must be 12 digits';
+                              return null;
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+                TextFormField(
+                  controller: _bankNameController,
+                  focusNode: _bankNameFocus,
+                  textInputAction: TextInputAction.next,
+                  decoration: const InputDecoration(
+                    labelText: 'Bank Name *',
+                    prefixIcon: Icon(Icons.account_balance),
+                  ),
+                  textCapitalization: TextCapitalization.words,
+                  validator: (v) =>
+                      v?.trim().isEmpty ?? true ? 'Bank name required' : null,
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _amountController,
+                  focusNode: _amountFocus,
+                  textInputAction: TextInputAction.next,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Amount *',
+                    prefixIcon: Icon(Icons.currency_rupee),
+                  ),
+                  validator: (v) {
+                    if (v?.trim().isEmpty ?? true) return 'Amount required';
+                    final amt = double.tryParse(v!);
+                    if (amt == null || amt <= 0) return 'Amount must be greater than 0';
+                    return null;
+                  },
+                  onChanged: (_) => setState(() {}),
+                ),
+                if (projectedBalance != null) ...[
+                  const SizedBox(height: 12),
+                  Card(
+                    color: insufficient ? Colors.red.shade50 : theme.colorScheme.primaryContainer,
+                    child: ListTile(
+                      leading: Icon(
+                        insufficient ? Icons.warning_amber : Icons.account_balance_wallet,
+                        color: insufficient ? Colors.red : theme.colorScheme.onPrimaryContainer,
+                      ),
+                      title: Text(
+                        'Balance After Transaction',
+                        style: theme.textTheme.bodyMedium,
+                      ),
+                      trailing: Text(
+                        '\u20B9${projectedBalance.toStringAsFixed(2)}',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: insufficient ? Colors.red : null,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+                if (insufficient) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    'Insufficient balance!',
+                    style: theme.textTheme.bodySmall?.copyWith(color: Colors.red),
+                  ),
+                ],
+                TextFormField(
+                  controller: _mobileController,
+                  focusNode: _mobileFocus,
+                  textInputAction: TextInputAction.next,
+                  keyboardType: TextInputType.phone,
+                  decoration: const InputDecoration(
+                    labelText: 'Mobile Number (optional)',
+                    prefixIcon: Icon(Icons.phone),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _txnIdController,
+                  focusNode: _txnIdFocus,
+                  textInputAction: TextInputAction.next,
+                  decoration: const InputDecoration(
+                    labelText: 'Transaction ID (optional)',
+                    prefixIcon: Icon(Icons.receipt),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _notesController,
+                  focusNode: _notesFocus,
+                  textInputAction: TextInputAction.next,
+                  maxLines: 2,
+                  decoration: const InputDecoration(
+                    labelText: 'Notes (optional)',
+                    prefixIcon: Icon(Icons.notes),
+                  ),
+                ),
+                const SizedBox(height: 16),
                 Card(
-                  color: theme.colorScheme.primaryContainer,
                   child: Padding(
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     child: Row(
                       children: [
-                        Icon(Icons.lightbulb, color: theme.colorScheme.onPrimaryContainer),
+                        Icon(Icons.monetization_on, color: theme.colorScheme.primary),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            'Detected: ₹${(_calculatedCommission!).toStringAsFixed(2)} commission included',
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: theme.colorScheme.onPrimaryContainer,
-                              fontWeight: FontWeight.w500,
-                            ),
+                            _autoCommission
+                                ? (_calculatedCommission != null
+                                    ? 'Commission: \u20B9${_calculatedCommission!.toStringAsFixed(2)}'
+                                    : 'Auto Commission ON')
+                                : 'Auto Commission OFF',
+                            style: theme.textTheme.bodyLarge,
                           ),
+                        ),
+                        TextButton.icon(
+                          onPressed: () => setState(() => _autoCommission = !_autoCommission),
+                          icon: Icon(
+                            _autoCommission ? Icons.toggle_on : Icons.toggle_off_outlined,
+                            color: _autoCommission ? Colors.green : Colors.grey,
+                            size: 28,
+                          ),
+                          label: Text(_autoCommission ? 'ON' : 'OFF'),
                         ),
                       ],
                     ),
                   ),
                 ),
-                const SizedBox(height: 12),
-              ],
-              TextFormField(
-                controller: _customerNameController,
-                decoration: const InputDecoration(
-                  labelText: 'Customer Name *',
-                  prefixIcon: Icon(Icons.person),
-                ),
-                textCapitalization: TextCapitalization.words,
-                validator: (v) =>
-                    v?.trim().isEmpty ?? true ? 'Customer name required' : null,
-              ),
-              const SizedBox(height: 16),
-              if (isPhonePe) ...[
-                Text('Select Account *', style: theme.textTheme.labelLarge),
                 const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: accounts.map((acc) {
-                    final selected = _selectedAccountId == acc.id;
-                    return ChoiceChip(
-                      label: Text(acc.name),
-                      selected: selected,
-                      onSelected: (v) => setState(() => _selectedAccountId = v ? acc.id : null),
-                    );
-                  }).toList(),
+                CheckboxListTile(
+                  title: const Text('Override Commission'),
+                  value: _commissionOverridden,
+                  onChanged: (v) => setState(() => _commissionOverridden = v ?? false),
+                  controlAffinity: ListTileControlAffinity.trailing,
                 ),
-                const SizedBox(height: 16),
-              ],
-              if (isAEPS) ...[
-                Card(
-                  color: theme.colorScheme.surfaceContainerHighest,
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(Icons.fingerprint, color: theme.colorScheme.primary),
-                            const SizedBox(width: 8),
-                            Text('AEPS Transaction', style: theme.textTheme.titleSmall?.copyWith(
-                              color: theme.colorScheme.primary,
-                              fontWeight: FontWeight.bold,
-                            )),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _aadhaarController,
-                          keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(
-                            labelText: 'Aadhaar Number *',
-                            prefixIcon: Icon(Icons.credit_card),
-                          ),
-                          validator: (v) {
-                            if (v?.trim().isEmpty ?? true) return 'Aadhaar number required';
-                            if (v!.trim().length < 12) return 'Aadhaar must be 12 digits';
-                            return null;
-                          },
-                        ),
-                      ],
+                if (_commissionOverridden) ...[
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    controller: _commissionController,
+                    focusNode: _commissionFocus,
+                    textInputAction: TextInputAction.done,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Commission Amount',
+                      prefixIcon: Icon(Icons.monetization_on),
                     ),
                   ),
-                ),
-                const SizedBox(height: 16),
-              ],
-              TextFormField(
-                controller: _bankNameController,
-                decoration: const InputDecoration(
-                  labelText: 'Bank Name *',
-                  prefixIcon: Icon(Icons.account_balance),
-                ),
-                textCapitalization: TextCapitalization.words,
-                validator: (v) =>
-                    v?.trim().isEmpty ?? true ? 'Bank name required' : null,
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _amountController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Amount *',
-                  prefixIcon: Icon(Icons.currency_rupee),
-                ),
-                validator: (v) {
-                  if (v?.trim().isEmpty ?? true) return 'Amount required';
-                  final amt = double.tryParse(v!);
-                  if (amt == null || amt <= 0) return 'Amount must be greater than 0';
-                  return null;
-                },
-                onChanged: (_) => setState(() {}),
-              ),
-              if (projectedBalance != null) ...[
-                const SizedBox(height: 12),
-                Card(
-                  color: insufficient ? Colors.red.shade50 : theme.colorScheme.primaryContainer,
-                  child: ListTile(
-                    leading: Icon(
-                      insufficient ? Icons.warning_amber : Icons.account_balance_wallet,
-                      color: insufficient ? Colors.red : theme.colorScheme.onPrimaryContainer,
-                    ),
-                    title: Text(
-                      'Balance After Transaction',
-                      style: theme.textTheme.bodyMedium,
-                    ),
-                    trailing: Text(
-                      '₹${projectedBalance.toStringAsFixed(2)}',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: insufficient ? Colors.red : null,
-                      ),
-                    ),
-                  ),
+                ],
+                const SizedBox(height: 24),
+                ElevatedButton(
+                  onPressed: (_loading || insufficient) ? null : _submit,
+                  child: _loading
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Text('Save ${widget.type.displayName}'),
                 ),
               ],
-              if (insufficient) ...[
-                const SizedBox(height: 4),
-                Text(
-                  'Insufficient balance!',
-                  style: theme.textTheme.bodySmall?.copyWith(color: Colors.red),
-                ),
-              ],
-              TextFormField(
-                controller: _mobileController,
-                keyboardType: TextInputType.phone,
-                decoration: const InputDecoration(
-                  labelText: 'Mobile Number (optional)',
-                  prefixIcon: Icon(Icons.phone),
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _txnIdController,
-                decoration: const InputDecoration(
-                  labelText: 'Transaction ID (optional)',
-                  prefixIcon: Icon(Icons.receipt),
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _notesController,
-                maxLines: 2,
-                decoration: const InputDecoration(
-                  labelText: 'Notes (optional)',
-                  prefixIcon: Icon(Icons.notes),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  child: Row(
-                    children: [
-                      Icon(Icons.monetization_on, color: theme.colorScheme.primary),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          _autoCommission
-                              ? (_calculatedCommission != null
-                                  ? 'Commission: ₹${_calculatedCommission!.toStringAsFixed(2)}'
-                                  : 'Auto Commission ON')
-                              : 'Auto Commission OFF',
-                          style: theme.textTheme.bodyLarge,
-                        ),
-                      ),
-                      TextButton.icon(
-                        onPressed: () => setState(() => _autoCommission = !_autoCommission),
-                        icon: Icon(
-                          _autoCommission ? Icons.toggle_on : Icons.toggle_off_outlined,
-                          color: _autoCommission ? Colors.green : Colors.grey,
-                          size: 28,
-                        ),
-                        label: Text(_autoCommission ? 'ON' : 'OFF'),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
-              CheckboxListTile(
-                title: const Text('Override Commission'),
-                value: _commissionOverridden,
-                onChanged: (v) => setState(() => _commissionOverridden = v ?? false),
-                controlAffinity: ListTileControlAffinity.trailing,
-              ),
-              if (_commissionOverridden) ...[
-                const SizedBox(height: 8),
-                TextFormField(
-                  controller: _commissionController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Commission Amount',
-                    prefixIcon: Icon(Icons.monetization_on),
-                  ),
-                ),
-              ],
-              const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: (_loading || insufficient) ? null : _submit,
-                child: _loading
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Text('Save ${widget.type.displayName}'),
-              ),
-            ],
+            ),
           ),
         ),
       ),

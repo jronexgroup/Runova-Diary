@@ -252,7 +252,7 @@ class BalancesNotifier extends StateNotifier<Map<String, DailyBalance>> {
         .subtract(const Duration(days: 1))
         .dateKey;
     final yesterday = state[yesterdayKey] ?? hive.getBalance(userId, yesterdayKey);
-    final yesterdayCustom = yesterday?.customBalances ?? {};
+    final yesterdayCustom = yesterday?.customClosingBalances ?? yesterday?.customOpeningBalances ?? {};
 
     final balance = DailyBalance.create(
       dateKey: dateKey,
@@ -301,7 +301,8 @@ class BalancesNotifier extends StateNotifier<Map<String, DailyBalance>> {
     double aepsClosing = balance.aepsOpeningBalance;
     double hasibulClosing = balance.hasibulOpeningBalance;
     double runaLailaClosing = balance.runaLailaOpeningBalance;
-    final customBal = Map<String, double>.from(balance.customBalances);
+
+    final customBal = Map<String, double>.from(balance.customOpeningBalances);
 
     String resolveAccountId(Transaction txn) {
       return txn.account ?? txn.phonePeAccount?.name ?? '';
@@ -340,7 +341,7 @@ class BalancesNotifier extends StateNotifier<Map<String, DailyBalance>> {
       aepsClosingBalance: aepsClosing,
       hasibulClosingBalance: hasibulClosing,
       runaLailaClosingBalance: runaLailaClosing,
-      customBalances: customBal,
+      customClosingBalances: customBal,
     );
     await hive.saveBalance(updated);
     _ref.read(syncServiceProvider).pushBalance(updated);
@@ -510,7 +511,8 @@ class AiSettingsNotifier extends StateNotifier<AiSettings> {
     final json = _ref.read(hiveServiceProvider).getAiSettingsJson(userId);
     if (json != null) {
       try {
-        state = AiSettings.fromJson(jsonDecode(json) as Map<String, dynamic>);
+        final parsed = AiSettings.fromJson(jsonDecode(json) as Map<String, dynamic>);
+        state = parsed.copyWith(enabled: parsed.apiKey.isNotEmpty);
         return;
       } catch (_) {}
     }
@@ -523,12 +525,7 @@ class AiSettingsNotifier extends StateNotifier<AiSettings> {
   }
 
   Future<void> setApiKey(String key, String userId) async {
-    state = state.copyWith(apiKey: key);
-    await save(userId);
-  }
-
-  Future<void> setModel(String model, String userId) async {
-    state = state.copyWith(model: model);
+    state = state.copyWith(apiKey: key, enabled: key.isNotEmpty);
     await save(userId);
   }
 
@@ -538,7 +535,7 @@ class AiSettingsNotifier extends StateNotifier<AiSettings> {
   }
 
   Future<void> update(AiSettings updated, String userId) async {
-    state = updated;
+    state = updated.copyWith(enabled: updated.apiKey.isNotEmpty);
     await save(userId);
   }
 }

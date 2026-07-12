@@ -19,7 +19,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _pinController = TextEditingController();
   final _confirmPinController = TextEditingController();
   final _aiApiKeyController = TextEditingController();
-  final _aiModelController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   bool _obscurePin = true;
   bool _loading = false;
@@ -33,6 +32,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     _ownerController.dispose();
     _pinController.dispose();
     _confirmPinController.dispose();
+    _aiApiKeyController.dispose();
     super.dispose();
   }
 
@@ -53,7 +53,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       if (_aiEnabled && userId != null) {
         final aiSettings = AiSettings(
           apiKey: _aiApiKeyController.text.trim(),
-          model: _aiModelController.text.trim().isEmpty ? 'sarvam-1' : _aiModelController.text.trim(),
           enabled: true,
         );
         await ref.read(aiSettingsProvider.notifier).update(aiSettings, userId);
@@ -186,15 +185,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     decoration: const InputDecoration(
                       labelText: 'Sarvam AI API Key',
                       prefixIcon: Icon(Icons.key),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: _aiModelController,
-                    decoration: const InputDecoration(
-                      labelText: 'AI Model',
-                      prefixIcon: Icon(Icons.smart_toy),
-                      hintText: 'sarvam-1',
                     ),
                   ),
                 ],

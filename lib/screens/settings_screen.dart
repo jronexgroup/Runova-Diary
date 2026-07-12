@@ -107,11 +107,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   title: const Text('Sync Now'),
                   onTap: () async {
                     await ref.read(syncServiceProvider).syncToFirebase();
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Sync completed')),
-                      );
-                    }
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Sync completed')),
+                    );
                   },
                 ),
                 const Divider(height: 1),
@@ -188,7 +187,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ElevatedButton.icon(
             onPressed: () async {
               await ref.read(authProvider.notifier).logout();
-              if (mounted) context.go('/login');
+              if (!context.mounted) return;
+              context.go('/login');
             },
             icon: const Icon(Icons.logout),
             label: const Text('Sign Out'),

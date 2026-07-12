@@ -14,7 +14,6 @@ class AiSettingsScreen extends ConsumerStatefulWidget {
 class _AiSettingsScreenState extends ConsumerState<AiSettingsScreen> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _apiKeyCtrl;
-  late TextEditingController _modelCtrl;
   bool _saving = false;
   bool _obscureKey = true;
 
@@ -23,13 +22,11 @@ class _AiSettingsScreenState extends ConsumerState<AiSettingsScreen> {
     super.initState();
     final s = ref.read(aiSettingsProvider);
     _apiKeyCtrl = TextEditingController(text: s.apiKey);
-    _modelCtrl = TextEditingController(text: s.model);
   }
 
   @override
   void dispose() {
     _apiKeyCtrl.dispose();
-    _modelCtrl.dispose();
     super.dispose();
   }
 
@@ -41,8 +38,7 @@ class _AiSettingsScreenState extends ConsumerState<AiSettingsScreen> {
 
     final updated = AiSettings(
       apiKey: _apiKeyCtrl.text.trim(),
-      model: _modelCtrl.text.trim().isEmpty ? 'sarvam-1' : _modelCtrl.text.trim(),
-      enabled: ref.read(aiSettingsProvider).enabled,
+      enabled: _apiKeyCtrl.text.trim().isNotEmpty,
     );
 
     await ref.read(aiSettingsProvider.notifier).update(updated, user.id);
@@ -96,15 +92,6 @@ class _AiSettingsScreenState extends ConsumerState<AiSettingsScreen> {
               },
             ),
             const SizedBox(height: 16),
-            TextFormField(
-              controller: _modelCtrl,
-              decoration: const InputDecoration(
-                labelText: 'AI Model',
-                prefixIcon: Icon(Icons.smart_toy),
-                hintText: 'sarvam-1',
-              ),
-            ),
-            const SizedBox(height: 16),
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16),
@@ -115,8 +102,8 @@ class _AiSettingsScreenState extends ConsumerState<AiSettingsScreen> {
                         style: Theme.of(context).textTheme.titleMedium),
                     const SizedBox(height: 8),
                     const Text(
-                      '1. Enable AI Processing above\n'
-                      '2. Enter your Sarvam AI API key\n'
+                      '1. Enter your Sarvam AI API key above\n'
+                      '2. AI will auto-enable when a key is saved\n'
                       '3. On any New Transaction screen, tap the AI button\n'
                       '4. Upload an image or document\n'
                       '5. AI will auto-fill the form fields',

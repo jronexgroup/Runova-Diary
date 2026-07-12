@@ -54,7 +54,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final aepsTxns = todayTxns.where((t) => t.type == TransactionType.aeps).toList();
     final cashInTxns = todayTxns.where((t) => t.type == TransactionType.cashIn).toList();
     final cashOutTxns = todayTxns.where((t) => t.type == TransactionType.cashOut).toList();
-    final todayCommission = todayTxns.fold(0.0, (sum, t) => sum + t.commission + t.distributorCommission);
+    final todayCommission = todayTxns
+        .where((t) => t.type != TransactionType.selfTransfer)
+        .fold(0.0, (sum, t) => sum + t.commission + t.distributorCommission);
 
     return Scaffold(
       appBar: AppBar(

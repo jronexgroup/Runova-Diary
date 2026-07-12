@@ -59,8 +59,9 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
         .fold(0.0, (s, t) => s + t.amount);
     final cashOutTotal = filtered.where((t) => t.type == TransactionType.cashOut)
         .fold(0.0, (s, t) => s + t.amount);
-    final ourCommission = filtered.fold(0.0, (s, t) => s + t.commission);
-    final distributorCommission = filtered.fold(0.0, (s, t) => s + t.distributorCommission);
+    final earningTxns = filtered.where((t) => t.type != TransactionType.selfTransfer).toList();
+    final ourCommission = earningTxns.fold(0.0, (s, t) => s + t.commission);
+    final distributorCommission = earningTxns.fold(0.0, (s, t) => s + t.distributorCommission);
     final totalCommission = ourCommission + distributorCommission;
 
     final dateKey = _customEnd?.dateKey ?? DateTime.now().dateKey;

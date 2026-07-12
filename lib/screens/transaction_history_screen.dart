@@ -136,14 +136,14 @@ class _TransactionHistoryScreenState
 
     final pinOk = await _requirePin();
     if (!pinOk) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Incorrect PIN')),
-        );
-      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Incorrect PIN')),
+      );
       return;
     }
 
+    if (!mounted) return;
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -553,11 +553,10 @@ class _TransactionHistoryScreenState
                                     onSelected: (v) async {
                                       final pinOk = await _requirePin();
                                       if (!pinOk) {
-                                        if (mounted) {
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            const SnackBar(content: Text('Incorrect PIN')),
-                                          );
-                                        }
+                                        if (!context.mounted) return;
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(content: Text('Incorrect PIN')),
+                                        );
                                         return;
                                       }
                                       switch (v) {

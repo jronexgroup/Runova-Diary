@@ -21,7 +21,6 @@ class AiService {
       final uri = Uri.parse('https://api.sarvam.ai/v1/document/extract');
       final request = http.MultipartRequest('POST', uri)
         ..headers['Authorization'] = 'Bearer ${settings.apiKey}'
-        ..headers['x-model'] = settings.model
         ..files.add(await http.MultipartFile.fromPath('file', filePath));
 
       final response = await request.send();
@@ -44,38 +43,52 @@ class AiService {
     final Map<String, dynamic> fields = {};
 
     try {
-      final text = (raw['text'] as String?) ?? (raw['extracted_text'] as String?) ?? '';
-      final lines = text.split('\n').map((l) => l.trim()).where((l) => l.isNotEmpty).toList();
-      final full = text.toLowerCase();
+      final text = (raw['text'] as String?) ??
+          (raw['extracted_text'] as String?) ??
+          (raw['ocr_text'] as String?) ??
+          '';
+      if (text.isEmpty) return fields;
 
-      if (full.contains('name:') || full.contains('customer:')) {
-        for (final line in lines) {
-          final lower = line.toLowerCase();
-          if (lower.startsWith('name:') || lower.startsWith('customer:')) {
-            fields['customerName'] = line.split(':').skip(1).join(':').trim();
-            break;
+      final lines = text.split('\n').map((l) => l.trim()).where((l) => l.isNotEmpty).toList();
+
+      for (final line in lines) {
+        final lower = line.toLowerCase();
+
+        if (fields['customerName'] == null &&
+            (lower.startsWith('name:') || lower.startsWith('customer:') || lower.startsWith('customer name:'))) {
+          final val = line.split(':').skip(1).join(':').trim();
+          if (val.isNotEmpty) fields['customerName'] = val;
+        }
+
+        if (fields['amount'] == null) {
+          final amtMatch = RegExp(r'(?:amount|amt|rs\.?|₹|total)\s*:?\s*([\d,]+\.?\d*)', caseSensitive: false)
+              .firstMatch(lower);
+          if (amtMatch != null) {
+            fields['amount'] = amtMatch.group(1)!.replaceAll(',', '');
           }
         }
-      }
 
-      final amountMatch = RegExp(r'(?:amount|amt|rs\.?|₹)\s*:?\s*([\d,]+\.?\d*)', caseSensitive: false).firstMatch(full);
-      if (amountMatch != null) {
-        fields['amount'] = amountMatch.group(1)!.replaceAll(',', '');
-      }
+        if (fields['mobileNumber'] == null) {
+          final mobileMatch = RegExp(r'\b\d{10}\b').firstMatch(line);
+          if (mobileMatch != null) {
+            fields['mobileNumber'] = mobileMatch.group(0);
+          }
+        }
 
-      final mobileMatch = RegExp(r'\b\d{10}\b').firstMatch(full);
-      if (mobileMatch != null) {
-        fields['mobileNumber'] = mobileMatch.group(0);
-      }
+        if (fields['transactionId'] == null) {
+          final txnMatch = RegExp(r'(?:txn\s*id|transaction\s*(?:id|no|number)|ref\s*(?:id|no|number))\s*:?\s*([A-Za-z0-9]+)', caseSensitive: false)
+              .firstMatch(line);
+          if (txnMatch != null) {
+            fields['transactionId'] = txnMatch.group(1);
+          }
+        }
 
-      final txnIdMatch = RegExp(r'(?:txn\s*id|transaction\s*(?:id|no|number)|ref\s*(?:id|no|number))\s*:?\s*([A-Za-z0-9]+)', caseSensitive: false).firstMatch(full);
-      if (txnIdMatch != null) {
-        fields['transactionId'] = txnIdMatch.group(1);
-      }
-
-      final aadhaarMatch = RegExp(r'\b\d{4}\s?\d{4}\s?\d{4}\b').firstMatch(full);
-      if (aadhaarMatch != null) {
-        fields['aadhaarNumber'] = aadhaarMatch.group(0)!.replaceAll(' ', '');
+        if (fields['aadhaarNumber'] == null) {
+          final aadhaarMatch = RegExp(r'\b\d{4}\s?\d{4}\s?\d{4}\b').firstMatch(line);
+          if (aadhaarMatch != null) {
+            fields['aadhaarNumber'] = aadhaarMatch.group(0)!.replaceAll(' ', '');
+          }
+        }
       }
     } catch (e) {
       debugPrint('Field extraction error: $e');
