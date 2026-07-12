@@ -1,11 +1,14 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../models/ai_settings.dart';
 
 class AiService {
   final AiSettings settings;
+  static const _baseUrl = 'https://api.sarvam.ai';
 
   AiService(this.settings);
 
@@ -18,25 +21,270 @@ class AiService {
       final file = File(filePath);
       if (!file.existsSync()) return {};
 
-      final uri = Uri.parse('https://api.sarvam.ai/v1/document/extract');
-      final request = http.MultipartRequest('POST', uri)
-        ..headers['Authorization'] = 'Bearer ${settings.apiKey}'
-        ..files.add(await http.MultipartFile.fromPath('file', filePath));
+      final isPdf = filePath.toLowerCase().endsWith('.pdf');
+      final bytes = await file.readAsBytes();
+      final pdfBytes = isPdf ? bytes : _imageToPdf(bytes);
 
-      final response = await request.send();
-      final body = await response.stream.bytesToString();
-
-      if (response.statusCode != 200) {
-        debugPrint('Sarvam AI API error: ${response.statusCode} $body');
-        return {};
-      }
-
-      final data = jsonDecode(body) as Map<String, dynamic>;
-      return _extractFields(data);
+      final result = await _runDocDigitization(pdfBytes);
+      return _extractFields(result);
     } catch (e) {
       debugPrint('Sarvam AI request failed: $e');
       return {};
     }
+  }
+
+  Uint8List _imageToPdf(Uint8List imageBytes) {
+    final width = 612;
+    final height = 792;
+    final imgData = base64Encode(imageBytes);
+
+    return Uint8List.fromList(utf8.encode('''%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 $width $height]
+   /Contents 4 0 R /Resources << /XObject << /Im0 5 0 R >> >> >>
+endobj
+
+4 0 obj
+<< /Length 44 >>
+stream
+q ${width} 0 0 ${height} 0 0 cm /Im0 Do Q
+endstream
+endobj
+
+5 0 obj
+<< /Type /XObject /Subtype /Image /Width ${_nearestEven(_imageWidth(imageBytes))}
+   /Height ${_nearestEven(_imageHeight(imageBytes))} /ColorSpace /DeviceRGB
+   /BitsPerComponent 8 /Filter /DCTDecode /Length ${imageBytes.length} >>
+stream
+${utf8.decode(imageBytes)}
+endstream
+endobj
+
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000266 00000 n 
+0000000360 00000 n 
+
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+${500 + imageBytes.length}
+%%EOF'''));
+  }
+
+  int _nearestEven(int v) => v % 2 == 0 ? v : v + 1;
+
+  int _imageWidth(Uint8List bytes) {
+    if (bytes.length < 24) return 600;
+    if (bytes[0] == 0xFF && bytes[1] == 0xD8) {
+      int pos = 2;
+      while (pos < bytes.length - 1) {
+        if (bytes[pos] == 0xFF && bytes[pos + 1] == 0xC0) {
+          return (bytes[pos + 7] << 8) | bytes[pos + 8];
+        }
+        if (bytes[pos] != 0xFF) break;
+        final segLen = (bytes[pos + 2] << 8) | bytes[pos + 3];
+        pos += segLen + 2;
+        if (pos >= bytes.length) break;
+      }
+    }
+    return 600;
+  }
+
+  int _imageHeight(Uint8List bytes) {
+    if (bytes.length < 24) return 800;
+    if (bytes[0] == 0xFF && bytes[1] == 0xD8) {
+      int pos = 2;
+      while (pos < bytes.length - 1) {
+        if (bytes[pos] == 0xFF && bytes[pos + 1] == 0xC0) {
+          return (bytes[pos + 5] << 8) | bytes[pos + 6];
+        }
+        if (bytes[pos] != 0xFF) break;
+        final segLen = (bytes[pos + 2] << 8) | bytes[pos + 3];
+        pos += segLen + 2;
+        if (pos >= bytes.length) break;
+      }
+    }
+    return 800;
+  }
+
+  Future<Map<String, dynamic>> _runDocDigitization(Uint8List pdfBytes) async {
+    final headers = {
+      'api-subscription-key': settings.apiKey,
+      'Content-Type': 'application/json',
+    };
+
+    final createResp = await http.post(
+      Uri.parse('$_baseUrl/doc-digitization/job/v1'),
+      headers: headers,
+      body: jsonEncode({
+        'job_parameters': {
+          'language': 'en-IN',
+          'output_format': 'json',
+        },
+      }),
+    );
+
+    if (createResp.statusCode != 202) {
+      debugPrint('Create job failed: ${createResp.statusCode} ${createResp.body}');
+      return {};
+    }
+
+    final createData = jsonDecode(createResp.body) as Map<String, dynamic>;
+    final jobId = createData['job_id'] as String;
+
+    final uploadResp = await http.post(
+      Uri.parse('$_baseUrl/doc-digitization/job/v1/upload-files'),
+      headers: headers,
+      body: jsonEncode({
+        'job_id': jobId,
+        'files': ['document.pdf'],
+      }),
+    );
+
+    if (uploadResp.statusCode != 200) {
+      debugPrint('Get upload URLs failed: ${uploadResp.statusCode} ${uploadResp.body}');
+      return {};
+    }
+
+    final uploadData = jsonDecode(uploadResp.body) as Map<String, dynamic>;
+    final uploadUrls = uploadData['upload_urls'] as Map<String, dynamic>;
+    final fileUrl = uploadUrls['document.pdf']?['file_url'] as String?;
+    if (fileUrl == null) {
+      debugPrint('No upload URL returned');
+      return {};
+    }
+
+    final putResp = await http.put(
+      Uri.parse(fileUrl),
+      headers: {'x-ms-blob-type': 'BlockBlob'},
+      body: pdfBytes,
+    );
+
+    if (putResp.statusCode != 201) {
+      debugPrint('File upload failed: ${putResp.statusCode}');
+      return {};
+    }
+
+    final startResp = await http.post(
+      Uri.parse('$_baseUrl/doc-digitization/job/v1/$jobId/start'),
+      headers: headers,
+    );
+
+    if (startResp.statusCode != 202) {
+      debugPrint('Start job failed: ${startResp.statusCode} ${startResp.body}');
+      return {};
+    }
+
+    for (int i = 0; i < 30; i++) {
+      await Future.delayed(Duration(seconds: i < 5 ? 2 : 5));
+
+      final statusResp = await http.get(
+        Uri.parse('$_baseUrl/doc-digitization/job/v1/$jobId/status'),
+        headers: headers,
+      );
+
+      if (statusResp.statusCode != 200) continue;
+
+      final statusData = jsonDecode(statusResp.body) as Map<String, dynamic>;
+      final jobState = statusData['job_state'] as String? ?? '';
+
+      if (jobState == 'Completed' || jobState == 'PartiallyCompleted') {
+        final downloadResp = await http.post(
+          Uri.parse('$_baseUrl/doc-digitization/job/v1/$jobId/download-files'),
+          headers: headers,
+        );
+
+        if (downloadResp.statusCode != 200) {
+          debugPrint('Download failed: ${downloadResp.statusCode}');
+          return {};
+        }
+
+        final downloadData = jsonDecode(downloadResp.body) as Map<String, dynamic>;
+        final dlUrls = downloadData['download_urls'] as Map<String, dynamic>;
+        final dlUrl = dlUrls.values.first?['file_url'] as String?;
+        if (dlUrl == null) return {};
+
+        final zipResp = await http.get(Uri.parse(dlUrl));
+        if (zipResp.statusCode != 200) return {};
+
+        final zipBytes = zipResp.bodyBytes;
+        return _parseZipOutput(zipBytes);
+      }
+
+      if (jobState == 'Failed') {
+        debugPrint('Job failed');
+        return {};
+      }
+    }
+
+    debugPrint('Job timed out');
+    return {};
+  }
+
+  Map<String, dynamic> _parseZipOutput(Uint8List zipBytes) {
+    final extracted = <String, dynamic>{};
+    if (zipBytes.length < 30) return extracted;
+
+    try {
+      int pos = 0;
+      final allText = StringBuffer();
+
+      while (pos < zipBytes.length - 30) {
+        if (zipBytes[pos] == 0x50 && zipBytes[pos + 1] == 0x4B &&
+            zipBytes[pos + 2] == 0x03 && zipBytes[pos + 3] == 0x04) {
+          final nameLen = (zipBytes[pos + 26] << 8) | zipBytes[pos + 27];
+          final extraLen = (zipBytes[pos + 28] << 8) | zipBytes[pos + 29];
+          final dataStart = pos + 30 + nameLen + extraLen;
+          final compressedSize = (zipBytes[pos + 18] << 8) | zipBytes[pos + 19] |
+              (zipBytes[pos + 20] << 16) | (zipBytes[pos + 21] << 24);
+
+          final name = utf8.decode(zipBytes.sublist(pos + 30, pos + 30 + nameLen));
+
+          if (!name.endsWith('/') && compressedSize > 0 && dataStart + compressedSize <= zipBytes.length) {
+            final content = utf8.decode(zipBytes.sublist(dataStart, dataStart + compressedSize));
+            allText.writeln(content);
+          }
+
+          final totalExtra = (zipBytes[pos + 30 - 2] << 8) | zipBytes[pos + 30 - 1];
+          pos += 30 + nameLen + extraLen + compressedSize;
+          if (totalExtra > 0) pos += totalExtra;
+        } else {
+          pos++;
+        }
+      }
+
+      final text = allText.toString();
+      if (text.isNotEmpty) {
+        extracted['text'] = text;
+
+        final jsonMatch = RegExp(r'\{[^{}]*\}').firstMatch(text);
+        if (jsonMatch != null) {
+          try {
+            final jsonData = jsonDecode(jsonMatch.group(0)!);
+            if (jsonData is Map<String, dynamic>) {
+              extracted.addAll(jsonData);
+            }
+          } catch (_) {}
+        }
+      }
+    } catch (e) {
+      debugPrint('ZIP parse error: $e');
+    }
+
+    return extracted;
   }
 
   Map<String, dynamic> _extractFields(Map<String, dynamic> raw) {
@@ -57,27 +305,33 @@ class AiService {
         if (fields['customerName'] == null &&
             (lower.startsWith('name:') || lower.startsWith('customer:') || lower.startsWith('customer name:'))) {
           final val = line.split(':').skip(1).join(':').trim();
-          if (val.isNotEmpty) fields['customerName'] = val;
+          if (val.isNotEmpty && val.length < 100) fields['customerName'] = val;
         }
 
         if (fields['amount'] == null) {
           final amtMatch = RegExp(r'(?:amount|amt|rs\.?|₹|total)\s*:?\s*([\d,]+\.?\d*)', caseSensitive: false)
               .firstMatch(lower);
           if (amtMatch != null) {
-            fields['amount'] = amtMatch.group(1)!.replaceAll(',', '');
+            final raw = amtMatch.group(1)!.replaceAll(',', '');
+            final val = double.tryParse(raw);
+            if (val != null && val > 0 && val < 99999999) {
+              fields['amount'] = raw;
+            }
           }
         }
 
         if (fields['mobileNumber'] == null) {
-          final mobileMatch = RegExp(r'\b\d{10}\b').firstMatch(line);
+          final mobileMatch = RegExp(r'\b[6-9]\d{9}\b').firstMatch(line);
           if (mobileMatch != null) {
             fields['mobileNumber'] = mobileMatch.group(0);
           }
         }
 
         if (fields['transactionId'] == null) {
-          final txnMatch = RegExp(r'(?:txn\s*id|transaction\s*(?:id|no|number)|ref\s*(?:id|no|number))\s*:?\s*([A-Za-z0-9]+)', caseSensitive: false)
-              .firstMatch(line);
+          final txnMatch = RegExp(
+            r'(?:txn\s*id|transaction\s*(?:id|no|number)|ref\s*(?:id|no|number)|utr)\s*:?\s*([A-Za-z0-9]{6,})',
+            caseSensitive: false,
+          ).firstMatch(line);
           if (txnMatch != null) {
             fields['transactionId'] = txnMatch.group(1);
           }
