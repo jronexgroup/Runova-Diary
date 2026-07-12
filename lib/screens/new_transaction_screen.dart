@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import '../providers/providers.dart';
+import '../services/ai_service.dart';
 import '../utils/constants.dart';
 import '../utils/date_utils.dart';
 
@@ -48,8 +50,35 @@ class _NewTransactionScreenState extends ConsumerState<NewTransactionScreen> {
     if (amount == null || amount <= 0) return null;
     if (!_autoCommission) return null;
     if (widget.type == TransactionType.cashIn || widget.type == TransactionType.cashOut) {
+      final cfg = _selectedAccountId != null
+          ? ref.read(commissionConfigsProvider.notifier).getAccountConfig(_selectedAccountId!)
+          : null;
+      final ciRanges = cfg?.cashInRanges;
+      final coRanges = cfg?.cashOutRanges;
+      if (ciRanges != null && ciRanges.isNotEmpty && widget.type == TransactionType.cashIn) {
+        final (_, commission) = ref.read(commissionServiceProvider).smartDetect(amount, cashInRanges: ciRanges);
+        return commission;
+      }
+      if (coRanges != null && coRanges.isNotEmpty && widget.type == TransactionType.cashOut) {
+        final (_, commission) = ref.read(commissionServiceProvider).smartDetect(amount, cashOutRanges: coRanges);
+        return commission;
+      }
       final (_, commission) = ref.read(commissionServiceProvider).smartDetect(amount);
       return commission;
+    }
+    if (widget.type == TransactionType.cashIn) {
+      final cfg = _selectedAccountId != null
+          ? ref.read(commissionConfigsProvider.notifier).getAccountConfig(_selectedAccountId!)
+          : null;
+      return ref.read(commissionServiceProvider).calculateCommission(amount, widget.type,
+          cashInRanges: cfg?.cashInRanges, cashInPerThousand: cfg?.cashInPerThousand);
+    }
+    if (widget.type == TransactionType.cashOut) {
+      final cfg = _selectedAccountId != null
+          ? ref.read(commissionConfigsProvider.notifier).getAccountConfig(_selectedAccountId!)
+          : null;
+      return ref.read(commissionServiceProvider).calculateCommission(amount, widget.type,
+          cashOutRanges: cfg?.cashOutRanges, cashOutPerThousand: cfg?.cashOutPerThousand);
     }
     return ref.read(commissionServiceProvider).calculateCommission(amount, widget.type);
   }
@@ -59,8 +88,60 @@ class _NewTransactionScreenState extends ConsumerState<NewTransactionScreen> {
     return c != null && c > 0;
   }
 
+  Future<void> _processAi() async {
+    final aiSettings = ref.read(aiSettingsProvider);
+    if (!aiSettings.enabled || aiSettings.apiKey.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('AI not configured. Enable in Settings > AI Settings')),
+      );
+      return;
+    }
+
+    final picker = ImagePicker();
+    final file = await picker.pickImage(source: ImageSource.gallery);
+    if (file == null) return;
+
+    setState(() => _loading = true);
+
+    final aiService = AiService(aiSettings);
+    final fields = await aiService.processDocument(file.path);
+
+    if (!mounted) return;
+    setState(() => _loading = false);
+
+    if (fields.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not extract data from image')),
+      );
+      return;
+    }
+
+    if (fields['customerName'] != null) {
+      _customerNameController.text = fields['customerName'] as String;
+    }
+    if (fields['amount'] != null) {
+      _amountController.text = fields['amount'] as String;
+    }
+    if (fields['mobileNumber'] != null) {
+      _mobileController.text = fields['mobileNumber'] as String;
+    }
+    if (fields['transactionId'] != null) {
+      _txnIdController.text = fields['transactionId'] as String;
+    }
+    if (fields['aadhaarNumber'] != null) {
+      _aadhaarController.text = fields['aadhaarNumber'] as String;
+    }
+
+    setState(() {});
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('AI filled ${fields.length} field(s)')),
+    );
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    if (_loading) return;
 
     final user = ref.read(authProvider);
     if (user == null) return;
@@ -186,13 +267,29 @@ class _NewTransactionScreenState extends ConsumerState<NewTransactionScreen> {
 
     return Scaffold(
       appBar: AppBar(title: Text(_title)),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
+      resizeToAvoidBottomInset: true,
+      floatingActionButton: ref.read(aiSettingsProvider).enabled
+          ? FloatingActionButton.small(
+              onPressed: _loading ? null : _processAi,
+              backgroundColor: Colors.teal,
+              child: _loading
+                  ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Icon(Icons.auto_awesome, color: Colors.white),
+            )
+          : null,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: EdgeInsets.only(
+            left: 16,
+            right: 16,
+            top: 16,
+            bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+          ),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
               if (_hasDetectedCommission) ...[
                 Card(
                   color: theme.colorScheme.primaryContainer,
@@ -427,6 +524,7 @@ class _NewTransactionScreenState extends ConsumerState<NewTransactionScreen> {
             ],
           ),
         ),
+      ),
       ),
     );
   }

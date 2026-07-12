@@ -19,18 +19,18 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   @override
   void initState() {
     super.initState();
-    _loadData();
+    _loadData().catchError((_) {});
   }
 
-  void _loadData() {
+  Future<void> _loadData() async {
     final user = ref.read(authProvider);
     if (user == null) return;
 
     ref.read(transactionsProvider.notifier).loadTransactions(user.id);
     ref.read(balancesProvider.notifier).loadBalances(user.id);
-    ref.read(accountsProvider.notifier).load(user.id);
     ref.read(commissionConfigsProvider.notifier).load(user.id);
-    _ensureTodayBalance(user.id);
+    await ref.read(accountsProvider.notifier).load(user.id);
+    await _ensureTodayBalance(user.id);
   }
 
   Future<void> _ensureTodayBalance(String userId) async {
@@ -54,7 +54,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final aepsTxns = todayTxns.where((t) => t.type == TransactionType.aeps).toList();
     final cashInTxns = todayTxns.where((t) => t.type == TransactionType.cashIn).toList();
     final cashOutTxns = todayTxns.where((t) => t.type == TransactionType.cashOut).toList();
-    final todayCommission = todayTxns.fold(0.0, (sum, t) => sum + t.commission);
+    final todayCommission = todayTxns.fold(0.0, (sum, t) => sum + t.commission + t.distributorCommission);
 
     return Scaffold(
       appBar: AppBar(
@@ -67,7 +67,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         ],
       ),
       body: RefreshIndicator(
-        onRefresh: () async => _loadData(),
+        onRefresh: () => _loadData(),
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.all(16),
@@ -134,16 +134,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 color: theme.colorScheme.primary,
               ),
               ...accounts.map((acc) {
-                final open = acc.id == 'hasibul'
-                    ? (todayBalance?.hasibulOpeningBalance ?? 0)
-                    : acc.id == 'runaLaila'
-                        ? (todayBalance?.runaLailaOpeningBalance ?? 0)
-                        : (todayBalance?.customBalances[acc.id] ?? 0);
-                final close = acc.id == 'hasibul'
-                    ? (todayBalance?.hasibulClosingBalance ?? 0)
-                    : acc.id == 'runaLaila'
-                        ? (todayBalance?.runaLailaClosingBalance ?? 0)
-                        : (todayBalance?.customBalances[acc.id] ?? 0);
+                final open = todayBalance?.getBalance(acc.id, closing: false) ?? 0;
+                final close = todayBalance?.getBalance(acc.id) ?? 0;
                 return BalanceCard(
                   label: acc.name,
                   opening: open,

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import '../models/transaction.dart';
 import '../providers/providers.dart';
+import '../services/ai_service.dart';
 import '../utils/constants.dart';
 
 class EditTransactionScreen extends ConsumerStatefulWidget {
@@ -86,9 +88,60 @@ class _EditTransactionScreenState extends ConsumerState<EditTransactionScreen> {
     return c != null && c > 0;
   }
 
+  Future<void> _processAi() async {
+    final aiSettings = ref.read(aiSettingsProvider);
+    if (!aiSettings.enabled || aiSettings.apiKey.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('AI not configured. Enable in Settings > AI Settings')),
+      );
+      return;
+    }
+
+    final picker = ImagePicker();
+    final file = await picker.pickImage(source: ImageSource.gallery);
+    if (file == null) return;
+
+    setState(() => _loading = true);
+    final aiService = AiService(aiSettings);
+    final fields = await aiService.processDocument(file.path);
+
+    if (!mounted) return;
+    setState(() => _loading = false);
+
+    if (fields.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not extract data from image')),
+      );
+      return;
+    }
+
+    if (fields['customerName'] != null) {
+      _customerNameController.text = fields['customerName'] as String;
+    }
+    if (fields['amount'] != null) {
+      _amountController.text = fields['amount'] as String;
+    }
+    if (fields['mobileNumber'] != null) {
+      _mobileController.text = fields['mobileNumber'] as String;
+    }
+    if (fields['transactionId'] != null) {
+      _txnIdController.text = fields['transactionId'] as String;
+    }
+    if (fields['aadhaarNumber'] != null) {
+      _aadhaarController.text = fields['aadhaarNumber'] as String;
+    }
+
+    setState(() {});
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('AI filled ${fields.length} field(s)')),
+    );
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     if (_original == null) return;
+    if (_loading) return;
 
     final user = ref.read(authProvider);
     if (user == null) return;
@@ -164,6 +217,15 @@ class _EditTransactionScreenState extends ConsumerState<EditTransactionScreen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Edit Transaction')),
+      floatingActionButton: ref.read(aiSettingsProvider).enabled
+          ? FloatingActionButton.small(
+              onPressed: _loading ? null : _processAi,
+              backgroundColor: Colors.teal,
+              child: _loading
+                  ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Icon(Icons.auto_awesome, color: Colors.white),
+            )
+          : null,
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Form(

@@ -231,8 +231,12 @@ class _TransactionHistoryScreenState
       notes: txn.notes,
       bankName: txn.bankName,
       phonePeAccount: txn.phonePeAccount,
+      account: txn.account,
+      fromAccount: txn.fromAccount,
+      toAccount: txn.toAccount,
       commission: txn.commission,
       commissionOverridden: txn.commissionOverridden,
+      distributorCommission: txn.distributorCommission,
     );
   }
 

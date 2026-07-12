@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../models/ai_settings.dart';
 import '../providers/providers.dart';
 import '../utils/constants.dart';
 
@@ -17,9 +18,13 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _ownerController = TextEditingController();
   final _pinController = TextEditingController();
   final _confirmPinController = TextEditingController();
+  final _aiApiKeyController = TextEditingController();
+  final _aiModelController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   bool _obscurePin = true;
   bool _loading = false;
+  bool _showAiSettings = false;
+  bool _aiEnabled = false;
 
   @override
   void dispose() {
@@ -43,6 +48,16 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         ownerName: _ownerController.text.trim(),
         pin: _pinController.text.trim(),
       );
+
+      final userId = ref.read(authProvider)?.id;
+      if (_aiEnabled && userId != null) {
+        final aiSettings = AiSettings(
+          apiKey: _aiApiKeyController.text.trim(),
+          model: _aiModelController.text.trim().isEmpty ? 'sarvam-1' : _aiModelController.text.trim(),
+          enabled: true,
+        );
+        await ref.read(aiSettingsProvider.notifier).update(aiSettings, userId);
+      }
 
       if (!mounted) return;
       context.go('/dashboard');
@@ -139,6 +154,50 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     return null;
                   },
                 ),
+                const SizedBox(height: 24),
+                InkWell(
+                  onTap: () => setState(() => _showAiSettings = !_showAiSettings),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Row(
+                      children: [
+                        Icon(_showAiSettings ? Icons.expand_less : Icons.expand_more, color: Colors.grey),
+                        const SizedBox(width: 8),
+                        const Icon(Icons.auto_awesome, color: Colors.teal, size: 20),
+                        const SizedBox(width: 8),
+                        Text('AI Settings (optional)', style: Theme.of(context).textTheme.titleSmall),
+                      ],
+                    ),
+                  ),
+                ),
+                if (_showAiSettings) ...[
+                  const SizedBox(height: 8),
+                  SwitchListTile(
+                    title: const Text('Enable AI Processing'),
+                    value: _aiEnabled,
+                    onChanged: (v) => setState(() => _aiEnabled = v),
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    controller: _aiApiKeyController,
+                    obscureText: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Sarvam AI API Key',
+                      prefixIcon: Icon(Icons.key),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _aiModelController,
+                    decoration: const InputDecoration(
+                      labelText: 'AI Model',
+                      prefixIcon: Icon(Icons.smart_toy),
+                      hintText: 'sarvam-1',
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 24),
                 ElevatedButton(
                   onPressed: _loading ? null : _register,

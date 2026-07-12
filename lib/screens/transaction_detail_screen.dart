@@ -85,14 +85,16 @@ class TransactionDetailScreen extends ConsumerWidget {
           if (txn.phonePeAccount != null)
             _detailTile(theme, 'PhonePe Account', txn.phonePeAccount!.displayName, Icons.phone_android),
           if (txn.account != null) ...[
-            _detailTile(theme, 'Account', _accountLabel(txn.account!), Icons.account_balance),
+            _detailTile(theme, 'Account', _accountLabel(ref, txn.account!), Icons.account_balance),
           ],
           if (txn.fromAccount != null && txn.toAccount != null) ...[
-            _detailTile(theme, 'From', _accountLabel(txn.fromAccount!), Icons.arrow_forward),
-            _detailTile(theme, 'To', _accountLabel(txn.toAccount!), Icons.arrow_back),
+            _detailTile(theme, 'From', _accountLabel(ref, txn.fromAccount!), Icons.arrow_forward),
+            _detailTile(theme, 'To', _accountLabel(ref, txn.toAccount!), Icons.arrow_back),
           ],
           _detailTile(theme, 'Balance After', '₹${txn.balanceAfterTransaction.toStringAsFixed(2)}', Icons.account_balance_wallet),
-          _detailTile(theme, 'Commission', '₹${txn.commission.toStringAsFixed(2)}', Icons.monetization_on),
+          _detailTile(theme, 'Our Commission', '₹${txn.commission.toStringAsFixed(2)}', Icons.monetization_on),
+          if (txn.distributorCommission > 0)
+            _detailTile(theme, 'Distributor Comm.', '₹${txn.distributorCommission.toStringAsFixed(2)}', Icons.people),
           _detailTile(theme, 'Date & Time', txn.createdAt.displayDateTime, Icons.schedule),
           if (txn.notes != null && txn.notes!.isNotEmpty)
             _detailTile(theme, 'Notes', txn.notes!, Icons.notes),
@@ -101,13 +103,12 @@ class TransactionDetailScreen extends ConsumerWidget {
     );
   }
 
-  String _accountLabel(String acct) {
-    switch (acct) {
-      case 'aeps': return 'AEPS';
-      case 'hasibul': return 'Hasibul PhonePe';
-      case 'runaLaila': return 'Runa Laila PhonePe';
-      default: return acct;
-    }
+  String _accountLabel(WidgetRef ref, String acct) {
+    if (acct == 'aeps') return 'AEPS';
+    final accounts = ref.read(accountsProvider);
+    final match = accounts.where((a) => a.id == acct);
+    if (match.isNotEmpty) return match.first.name;
+    return acct;
   }
 
   Widget _detailTile(ThemeData theme, String label, String value, IconData icon) {

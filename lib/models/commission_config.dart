@@ -5,22 +5,30 @@ class CommissionConfig {
   final double cashInPerThousand;
   final double cashOutPerThousand;
   final double settlementCharge;
+  final List<CommissionRange> cashInRanges;
+  final List<CommissionRange> cashOutRanges;
 
   const CommissionConfig({
     this.cashInPerThousand = 10,
     this.cashOutPerThousand = 10,
     this.settlementCharge = 5,
+    this.cashInRanges = const [],
+    this.cashOutRanges = const [],
   });
 
   CommissionConfig copyWith({
     double? cashInPerThousand,
     double? cashOutPerThousand,
     double? settlementCharge,
+    List<CommissionRange>? cashInRanges,
+    List<CommissionRange>? cashOutRanges,
   }) {
     return CommissionConfig(
       cashInPerThousand: cashInPerThousand ?? this.cashInPerThousand,
       cashOutPerThousand: cashOutPerThousand ?? this.cashOutPerThousand,
       settlementCharge: settlementCharge ?? this.settlementCharge,
+      cashInRanges: cashInRanges ?? this.cashInRanges,
+      cashOutRanges: cashOutRanges ?? this.cashOutRanges,
     );
   }
 
@@ -28,6 +36,8 @@ class CommissionConfig {
     'cashInPerThousand': cashInPerThousand,
     'cashOutPerThousand': cashOutPerThousand,
     'settlementCharge': settlementCharge,
+    'cashInRanges': cashInRanges.map((r) => r.toJson()).toList(),
+    'cashOutRanges': cashOutRanges.map((r) => r.toJson()).toList(),
   };
 
   factory CommissionConfig.fromJson(Map<String, dynamic> json) {
@@ -35,6 +45,50 @@ class CommissionConfig {
       cashInPerThousand: (json['cashInPerThousand'] as num?)?.toDouble() ?? 10,
       cashOutPerThousand: (json['cashOutPerThousand'] as num?)?.toDouble() ?? 10,
       settlementCharge: (json['settlementCharge'] as num?)?.toDouble() ?? 5,
+      cashInRanges: json['cashInRanges'] != null
+          ? (json['cashInRanges'] as List)
+              .map((r) => CommissionRange.fromJson(r as Map<String, dynamic>))
+              .toList()
+          : [],
+      cashOutRanges: json['cashOutRanges'] != null
+          ? (json['cashOutRanges'] as List)
+              .map((r) => CommissionRange.fromJson(r as Map<String, dynamic>))
+              .toList()
+          : [],
+    );
+  }
+}
+
+class CommissionRange {
+  final int min;
+  final int max;
+  final double rate;
+
+  const CommissionRange({
+    required this.min,
+    required this.max,
+    required this.rate,
+  });
+
+  Map<String, dynamic> toJson() => {
+    'min': min,
+    'max': max,
+    'rate': rate,
+  };
+
+  factory CommissionRange.fromJson(Map<String, dynamic> json) {
+    return CommissionRange(
+      min: (json['min'] as num).toInt(),
+      max: (json['max'] as num).toInt(),
+      rate: (json['rate'] as num).toDouble(),
+    );
+  }
+
+  CommissionRange copyWith({int? min, int? max, double? rate}) {
+    return CommissionRange(
+      min: min ?? this.min,
+      max: max ?? this.max,
+      rate: rate ?? this.rate,
     );
   }
 }

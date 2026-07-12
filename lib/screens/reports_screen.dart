@@ -168,11 +168,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                       '₹${(dayBalance?.aepsClosingBalance ?? 0).toStringAsFixed(2)}'),
                   const Divider(),
                   ...accounts.map((acc) {
-                    final bal = acc.id == 'hasibul'
-                        ? (dayBalance?.hasibulClosingBalance ?? 0)
-                        : acc.id == 'runaLaila'
-                            ? (dayBalance?.runaLailaClosingBalance ?? 0)
-                            : (dayBalance?.customBalances[acc.id] ?? 0);
+                    final bal = dayBalance?.getBalance(acc.id) ?? 0;
                     return Column(
                       children: [
                         _reportRow(acc.name, '₹${bal.toStringAsFixed(2)}'),

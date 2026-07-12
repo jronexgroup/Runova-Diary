@@ -36,6 +36,7 @@ class _SelfTransferScreenState extends ConsumerState<SelfTransferScreen> {
   }
 
   Future<void> _submit() async {
+    if (_loading) return;
     if (_fromAccountId == null || _toAccountId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Select both accounts')),

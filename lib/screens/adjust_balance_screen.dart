@@ -28,6 +28,7 @@ class _AdjustBalanceScreenState extends ConsumerState<AdjustBalanceScreen> {
   }
 
   Future<void> _submit() async {
+    if (_loading) return;
     if (_selectedAccountId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select an account')),

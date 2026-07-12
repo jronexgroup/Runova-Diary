@@ -120,4 +120,12 @@ class HiveService {
   String? getCommissionConfigsJson(String userId) {
     return _settingsBox.get('${userId}_commissions') as String?;
   }
+
+  Future<void> saveAiSettingsJson(String userId, String jsonStr) async {
+    await _settingsBox.put('${userId}_ai', jsonStr);
+  }
+
+  String? getAiSettingsJson(String userId) {
+    return _settingsBox.get('${userId}_ai') as String?;
+  }
 }

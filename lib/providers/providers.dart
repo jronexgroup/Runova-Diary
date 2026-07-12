@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/bank_account.dart';
+import '../models/ai_settings.dart';
 import '../models/commission_config.dart';
 import '../models/daily_balance.dart';
 import '../models/transaction.dart';
@@ -54,6 +55,15 @@ class AuthNotifier extends StateNotifier<AppUser?> {
       pin: pin,
     );
     state = user;
+    if (state != null) {
+      final sync = _ref.read(syncServiceProvider);
+      await sync.syncFromFirebase();
+      _ref.read(transactionsProvider.notifier).loadTransactions(state!.id);
+      _ref.read(balancesProvider.notifier).loadBalances(state!.id);
+      await       _ref.read(accountsProvider.notifier).load(state!.id);
+      _ref.read(commissionConfigsProvider.notifier).load(state!.id);
+      _ref.read(aiSettingsProvider.notifier).load(state!.id);
+    }
   }
 
   Future<bool> login({
@@ -70,8 +80,9 @@ class AuthNotifier extends StateNotifier<AppUser?> {
       await sync.syncFromFirebase();
       _ref.read(transactionsProvider.notifier).loadTransactions(user.id);
       _ref.read(balancesProvider.notifier).loadBalances(user.id);
-      _ref.read(accountsProvider.notifier).load(user.id);
+      await       _ref.read(accountsProvider.notifier).load(user.id);
       _ref.read(commissionConfigsProvider.notifier).load(user.id);
+      _ref.read(aiSettingsProvider.notifier).load(user.id);
     }
     return user != null;
   }
@@ -167,13 +178,12 @@ class TransactionsNotifier extends StateNotifier<List<Transaction>> {
 
   Future<int> deleteTransactionsForDate(String userId, String dateKey) async {
     final hive = _ref.read(hiveServiceProvider);
+    final toDelete = state.where((t) => t.createdAt.dateKey == dateKey).toList();
     final count = await hive.deleteTransactionsForDate(userId, dateKey);
     state = state.where((t) => t.createdAt.dateKey != dateKey).toList();
     final sync = _ref.read(syncServiceProvider);
-    for (final txn in state) {
-      if (txn.createdAt.dateKey == dateKey) {
-        await sync.pushDeleteTransaction(userId, txn.id);
-      }
+    for (final txn in toDelete) {
+      await sync.pushDeleteTransaction(userId, txn.id);
     }
     await _ref.read(balancesProvider.notifier).recalculateDayBalances(userId, dateKey);
     return count;
@@ -351,7 +361,7 @@ class AccountsNotifier extends StateNotifier<List<BankAccount>> {
 
   AccountsNotifier(this._ref) : super([]);
 
-  void load(String userId) {
+  Future<void> load(String userId) async {
     final json = _ref.read(hiveServiceProvider).getAccountsJson(userId);
     if (json != null) {
       try {
@@ -363,6 +373,7 @@ class AccountsNotifier extends StateNotifier<List<BankAccount>> {
       } catch (_) {}
     }
     state = _defaultAccounts();
+    await save(userId);
   }
 
   List<BankAccount> _defaultAccounts() => [
@@ -482,6 +493,52 @@ class CommissionConfigsNotifier extends StateNotifier<Map<String, dynamic>> {
 
   Future<void> setAepsConfig(AepsCommissionConfig config, String userId) async {
     state = {...state, 'aeps': config.toJson()};
+    await save(userId);
+  }
+}
+
+final aiSettingsProvider = StateNotifierProvider<AiSettingsNotifier, AiSettings>((ref) {
+  return AiSettingsNotifier(ref);
+});
+
+class AiSettingsNotifier extends StateNotifier<AiSettings> {
+  final Ref _ref;
+
+  AiSettingsNotifier(this._ref) : super(const AiSettings());
+
+  void load(String userId) {
+    final json = _ref.read(hiveServiceProvider).getAiSettingsJson(userId);
+    if (json != null) {
+      try {
+        state = AiSettings.fromJson(jsonDecode(json) as Map<String, dynamic>);
+        return;
+      } catch (_) {}
+    }
+    state = const AiSettings();
+  }
+
+  Future<void> save(String userId) async {
+    await _ref.read(hiveServiceProvider).saveAiSettingsJson(userId, jsonEncode(state.toJson()));
+    _ref.read(syncServiceProvider).pushAiSettings(userId, state.toJson());
+  }
+
+  Future<void> setApiKey(String key, String userId) async {
+    state = state.copyWith(apiKey: key);
+    await save(userId);
+  }
+
+  Future<void> setModel(String model, String userId) async {
+    state = state.copyWith(model: model);
+    await save(userId);
+  }
+
+  Future<void> setEnabled(bool enabled, String userId) async {
+    state = state.copyWith(enabled: enabled);
+    await save(userId);
+  }
+
+  Future<void> update(AiSettings updated, String userId) async {
+    state = updated;
     await save(userId);
   }
 }

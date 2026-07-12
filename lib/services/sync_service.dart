@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 import '../models/bank_account.dart';
@@ -38,6 +39,30 @@ class SyncService {
       for (final bal in fbBalances) {
         await _hiveService.saveBalance(bal);
       }
+
+      final accounts = await pullAccounts(user.id);
+      if (accounts.isNotEmpty) {
+        await _hiveService.saveAccountsJson(
+          user.id,
+          jsonEncode(accounts.map((a) => a.toJson()).toList()),
+        );
+      }
+
+      final configs = await pullCommissionConfigs(user.id);
+      if (configs.isNotEmpty) {
+        await _hiveService.saveCommissionConfigsJson(
+          user.id,
+          jsonEncode(configs),
+        );
+      }
+
+      final aiSettings = await pullAiSettings(user.id);
+      if (aiSettings.isNotEmpty) {
+        await _hiveService.saveAiSettingsJson(
+          user.id,
+          jsonEncode(aiSettings),
+        );
+      }
     } catch (e) {
       debugPrint('Sync from Firebase failed: $e');
     }
@@ -56,6 +81,24 @@ class SyncService {
       final balances = _hiveService.getAllBalances(user.id);
       for (final bal in balances) {
         await _firebaseService.saveBalance(bal);
+      }
+
+      final accountsJson = _hiveService.getAccountsJson(user.id);
+      if (accountsJson != null) {
+        final accounts = (jsonDecode(accountsJson) as List)
+            .map((j) => BankAccount.fromJson(j as Map<String, dynamic>))
+            .toList();
+        await pushAccounts(user.id, accounts);
+      }
+
+      final configsJson = _hiveService.getCommissionConfigsJson(user.id);
+      if (configsJson != null) {
+        await pushCommissionConfigs(user.id, jsonDecode(configsJson) as Map<String, dynamic>);
+      }
+
+      final aiJson = _hiveService.getAiSettingsJson(user.id);
+      if (aiJson != null) {
+        await pushAiSettings(user.id, jsonDecode(aiJson) as Map<String, dynamic>);
       }
     } catch (e) {
       debugPrint('Sync to Firebase failed: $e');
@@ -135,6 +178,24 @@ class SyncService {
       return data ?? {};
     } catch (e) {
       debugPrint('Pull commission configs failed: $e');
+      return {};
+    }
+  }
+
+  Future<void> pushAiSettings(String userId, Map<String, dynamic> settings) async {
+    try {
+      await _firebaseService.saveSettings(userId, 'ai_settings', settings);
+    } catch (e) {
+      debugPrint('Push AI settings failed: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> pullAiSettings(String userId) async {
+    try {
+      final data = await _firebaseService.getSettings(userId, 'ai_settings');
+      return data ?? {};
+    } catch (e) {
+      debugPrint('Pull AI settings failed: $e');
       return {};
     }
   }

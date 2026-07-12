@@ -14,6 +14,11 @@ import '../screens/settings_screen.dart';
 import '../screens/transaction_detail_screen.dart';
 import '../screens/bank_accounts_screen.dart';
 import '../screens/commission_settings_screen.dart';
+import '../screens/ai_settings_screen.dart';
+import '../screens/aeps_commission_screen.dart';
+import '../screens/distributor_commission_screen.dart';
+import '../screens/settlement_charge_screen.dart';
+import '../screens/account_commission_screen.dart';
 import '../screens/change_pin_screen.dart';
 import '../screens/adjust_balance_screen.dart';
 import '../screens/self_transfer_screen.dart';
@@ -104,6 +109,30 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/commission-settings',
         builder: (_, __) => const CommissionSettingsScreen(),
+      ),
+      GoRoute(
+        path: '/commission-settings/aeps',
+        builder: (_, __) => const AepsCommissionScreen(),
+      ),
+      GoRoute(
+        path: '/commission-settings/distributor',
+        builder: (_, __) => const DistributorCommissionScreen(),
+      ),
+      GoRoute(
+        path: '/commission-settings/settlement',
+        builder: (_, __) => const SettlementChargeScreen(),
+      ),
+      GoRoute(
+        path: '/commission-settings/account/:id',
+        builder: (_, state) {
+          final id = state.pathParameters['id'] ?? '';
+          final name = state.extra as String? ?? 'Account';
+          return AccountCommissionScreen(accountId: id, accountName: name);
+        },
+      ),
+      GoRoute(
+        path: '/ai-settings',
+        builder: (_, __) => const AiSettingsScreen(),
       ),
       GoRoute(
         path: '/change-pin',
