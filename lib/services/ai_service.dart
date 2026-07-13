@@ -42,7 +42,7 @@ class AiService {
     localHeader.setUint16(off, 20, Endian.little); off += 2;
     localHeader.setUint16(off, 0, Endian.little); off += 2;
     localHeader.setUint16(off, 0, Endian.little); off += 2;
-    localHeader.setUint16(off, 8, Endian.little); off += 2;
+    localHeader.setUint16(off, 0, Endian.little); off += 2;
     localHeader.setUint16(off, 0, Endian.little); off += 2;
     localHeader.setUint32(off, crc32, Endian.little); off += 4;
     localHeader.setUint32(off, imageBytes.length, Endian.little); off += 4;
@@ -56,7 +56,7 @@ class AiService {
     centralDir.setUint16(cdOff, 20, Endian.little); cdOff += 2;
     centralDir.setUint16(cdOff, 20, Endian.little); cdOff += 2;
     centralDir.setUint16(cdOff, 0, Endian.little); cdOff += 2;
-    centralDir.setUint16(cdOff, 8, Endian.little); cdOff += 2;
+    centralDir.setUint16(cdOff, 0, Endian.little); cdOff += 2;
     centralDir.setUint16(cdOff, 0, Endian.little); cdOff += 2;
     centralDir.setUint32(cdOff, crc32, Endian.little); cdOff += 4;
     centralDir.setUint32(cdOff, imageBytes.length, Endian.little); cdOff += 4;
@@ -119,7 +119,7 @@ class AiService {
       body: jsonEncode({
         'job_parameters': {
           'language': 'en-IN',
-          'output_format': 'json',
+          'output_format': 'md',
         },
       }),
     );
@@ -228,6 +228,7 @@ class AiService {
     try {
       int pos = 0;
       final allText = StringBuffer();
+      String? jsonContent;
 
       while (pos < zipBytes.length - 30) {
         if (zipBytes[pos] == 0x50 && zipBytes[pos + 1] == 0x4B &&
@@ -242,7 +243,11 @@ class AiService {
 
           if (!name.endsWith('/') && compressedSize > 0 && dataStart + compressedSize <= zipBytes.length) {
             final content = utf8.decode(zipBytes.sublist(dataStart, dataStart + compressedSize));
-            allText.writeln(content);
+            if (name.endsWith('.json')) {
+              jsonContent = content;
+            } else {
+              allText.writeln(content);
+            }
           }
 
           final totalExtra = (zipBytes[pos + 30 - 2] << 8) | zipBytes[pos + 30 - 1];
@@ -253,19 +258,29 @@ class AiService {
         }
       }
 
-      final text = allText.toString();
-      if (text.isNotEmpty) {
-        extracted['text'] = text;
-
-        final jsonMatch = RegExp(r'\{[^{}]*\}').firstMatch(text);
-        if (jsonMatch != null) {
-          try {
-            final jsonData = jsonDecode(jsonMatch.group(0)!);
-            if (jsonData is Map<String, dynamic>) {
-              extracted.addAll(jsonData);
+      if (jsonContent != null) {
+        try {
+          final jsonData = jsonDecode(jsonContent) as Map<String, dynamic>;
+          extracted.addAll(jsonData);
+          final pages = jsonData['pages'] as List?;
+          if (pages != null && pages.isNotEmpty) {
+            final pageTexts = <String>[];
+            for (final page in pages) {
+              if (page is Map<String, dynamic>) {
+                final text = page['text'] as String? ?? page['markdown'] as String? ?? '';
+                if (text.isNotEmpty) pageTexts.add(text);
+              }
             }
-          } catch (_) {}
-        }
+            if (pageTexts.isNotEmpty) {
+              extracted['text'] = pageTexts.join('\n');
+            }
+          }
+        } catch (_) {}
+      }
+
+      if (extracted['text'] == null) {
+        final text = allText.toString();
+        if (text.isNotEmpty) extracted['text'] = text;
       }
     } catch (e) {
       debugPrint('ZIP parse error: $e');
