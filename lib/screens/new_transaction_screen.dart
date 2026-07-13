@@ -66,38 +66,18 @@ class _NewTransactionScreenState extends ConsumerState<NewTransactionScreen> {
     final amount = double.tryParse(_amountController.text);
     if (amount == null || amount <= 0) return null;
     if (!_autoCommission) return null;
-    if (widget.type == TransactionType.cashIn || widget.type == TransactionType.cashOut) {
-      final cfg = _selectedAccountId != null
-          ? ref.read(commissionConfigsProvider.notifier).getAccountConfig(_selectedAccountId!)
-          : null;
-      final ciRanges = cfg?.cashInRanges;
-      final coRanges = cfg?.cashOutRanges;
-      if (ciRanges != null && ciRanges.isNotEmpty && widget.type == TransactionType.cashIn) {
-        final (_, commission) = ref.read(commissionServiceProvider).smartDetect(amount, cashInRanges: ciRanges);
-        return commission;
-      }
-      if (coRanges != null && coRanges.isNotEmpty && widget.type == TransactionType.cashOut) {
-        final (_, commission) = ref.read(commissionServiceProvider).smartDetect(amount, cashOutRanges: coRanges);
-        return commission;
-      }
-      final (_, commission) = ref.read(commissionServiceProvider).smartDetect(amount);
-      return commission;
-    }
-    if (widget.type == TransactionType.cashIn) {
-      final cfg = _selectedAccountId != null
-          ? ref.read(commissionConfigsProvider.notifier).getAccountConfig(_selectedAccountId!)
-          : null;
-      return ref.read(commissionServiceProvider).calculateCommission(amount, widget.type,
-          cashInRanges: cfg?.cashInRanges, cashInPerThousand: cfg?.cashInPerThousand);
-    }
-    if (widget.type == TransactionType.cashOut) {
-      final cfg = _selectedAccountId != null
-          ? ref.read(commissionConfigsProvider.notifier).getAccountConfig(_selectedAccountId!)
-          : null;
-      return ref.read(commissionServiceProvider).calculateCommission(amount, widget.type,
-          cashOutRanges: cfg?.cashOutRanges, cashOutPerThousand: cfg?.cashOutPerThousand);
-    }
-    return ref.read(commissionServiceProvider).calculateCommission(amount, widget.type);
+
+    final cfg = widget.type == TransactionType.cashIn || widget.type == TransactionType.cashOut
+        ? (_selectedAccountId != null
+            ? ref.read(commissionConfigsProvider.notifier).getAccountConfig(_selectedAccountId!)
+            : null)
+        : null;
+
+    return ref.read(commissionServiceProvider).calculateCommission(amount, widget.type,
+        cashInRanges: cfg?.cashInRanges,
+        cashOutRanges: cfg?.cashOutRanges,
+        cashInPerThousand: cfg?.cashInPerThousand,
+        cashOutPerThousand: cfg?.cashOutPerThousand);
   }
 
   bool get _hasDetectedCommission {
@@ -278,6 +258,7 @@ class _NewTransactionScreenState extends ConsumerState<NewTransactionScreen> {
         widget.type == TransactionType.cashOut;
     final isAEPS = widget.type == TransactionType.aeps;
     final accounts = ref.watch(accountsProvider);
+    ref.watch(commissionConfigsProvider);
     final projectedBalance = _newBalance;
     final insufficient = widget.type == TransactionType.cashOut &&
         projectedBalance != null && projectedBalance < 0;

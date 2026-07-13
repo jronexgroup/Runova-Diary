@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:math';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -21,11 +20,10 @@ class AiService {
       final file = File(filePath);
       if (!file.existsSync()) return {};
 
-      final isPdf = filePath.toLowerCase().endsWith('.pdf');
       final bytes = await file.readAsBytes();
-      final pdfBytes = isPdf ? bytes : _imageToPdf(bytes);
+      final zipBytes = _imageToZip(bytes);
 
-      final result = await _runDocDigitization(pdfBytes);
+      final result = await _runDocDigitization(zipBytes);
       return _extractFields(result);
     } catch (e) {
       debugPrint('Sarvam AI request failed: $e');
@@ -33,91 +31,80 @@ class AiService {
     }
   }
 
-  Uint8List _imageToPdf(Uint8List imageBytes) {
-    final width = 612;
-    final height = 792;
-    final imgData = base64Encode(imageBytes);
+  Uint8List _imageToZip(Uint8List imageBytes) {
+    final fileName = 'document.jpg';
+    final fileNameBytes = utf8.encode(fileName);
+    final crc32 = _crc32(imageBytes);
 
-    return Uint8List.fromList(utf8.encode('''%PDF-1.4
-1 0 obj
-<< /Type /Catalog /Pages 2 0 R >>
-endobj
+    final localHeader = ByteData(30);
+    int off = 0;
+    localHeader.setUint32(off, 0x04034b50, Endian.little); off += 4;
+    localHeader.setUint16(off, 20, Endian.little); off += 2;
+    localHeader.setUint16(off, 0, Endian.little); off += 2;
+    localHeader.setUint16(off, 0, Endian.little); off += 2;
+    localHeader.setUint16(off, 8, Endian.little); off += 2;
+    localHeader.setUint16(off, 0, Endian.little); off += 2;
+    localHeader.setUint32(off, crc32, Endian.little); off += 4;
+    localHeader.setUint32(off, imageBytes.length, Endian.little); off += 4;
+    localHeader.setUint32(off, imageBytes.length, Endian.little); off += 4;
+    localHeader.setUint16(off, fileNameBytes.length, Endian.little); off += 2;
+    localHeader.setUint16(off, 0, Endian.little);
 
-2 0 obj
-<< /Type /Pages /Kids [3 0 R] /Count 1 >>
-endobj
+    final centralDir = ByteData(46);
+    int cdOff = 0;
+    centralDir.setUint32(cdOff, 0x02014b50, Endian.little); cdOff += 4;
+    centralDir.setUint16(cdOff, 20, Endian.little); cdOff += 2;
+    centralDir.setUint16(cdOff, 20, Endian.little); cdOff += 2;
+    centralDir.setUint16(cdOff, 0, Endian.little); cdOff += 2;
+    centralDir.setUint16(cdOff, 8, Endian.little); cdOff += 2;
+    centralDir.setUint16(cdOff, 0, Endian.little); cdOff += 2;
+    centralDir.setUint32(cdOff, crc32, Endian.little); cdOff += 4;
+    centralDir.setUint32(cdOff, imageBytes.length, Endian.little); cdOff += 4;
+    centralDir.setUint32(cdOff, imageBytes.length, Endian.little); cdOff += 4;
+    centralDir.setUint16(cdOff, fileNameBytes.length, Endian.little); cdOff += 2;
+    centralDir.setUint16(cdOff, 0, Endian.little); cdOff += 2;
+    centralDir.setUint16(cdOff, 0, Endian.little); cdOff += 2;
+    centralDir.setUint16(cdOff, 0, Endian.little); cdOff += 2;
+    centralDir.setUint16(cdOff, 0, Endian.little); cdOff += 2;
+    centralDir.setUint32(cdOff, 0, Endian.little); cdOff += 4;
+    centralDir.setUint32(cdOff, 0, Endian.little);
 
-3 0 obj
-<< /Type /Page /Parent 2 0 R /MediaBox [0 0 $width $height]
-   /Contents 4 0 R /Resources << /XObject << /Im0 5 0 R >> >> >>
-endobj
+    final eocd = ByteData(22);
+    int eo = 0;
+    eocd.setUint32(eo, 0x06054b50, Endian.little); eo += 4;
+    eocd.setUint16(eo, 0, Endian.little); eo += 2;
+    eocd.setUint16(eo, 0, Endian.little); eo += 2;
+    eocd.setUint16(eo, 1, Endian.little); eo += 2;
+    eocd.setUint16(eo, 1, Endian.little); eo += 2;
+    final cdSize = 46;
+    final cdOffset = 30 + fileNameBytes.length + imageBytes.length;
+    eocd.setUint32(eo, cdSize, Endian.little); eo += 4;
+    eocd.setUint32(eo, cdOffset, Endian.little); eo += 4;
+    eocd.setUint16(eo, 0, Endian.little);
 
-4 0 obj
-<< /Length 44 >>
-stream
-q ${width} 0 0 ${height} 0 0 cm /Im0 Do Q
-endstream
-endobj
-
-5 0 obj
-<< /Type /XObject /Subtype /Image /Width ${_nearestEven(_imageWidth(imageBytes))}
-   /Height ${_nearestEven(_imageHeight(imageBytes))} /ColorSpace /DeviceRGB
-   /BitsPerComponent 8 /Filter /DCTDecode /Length ${imageBytes.length} >>
-stream
-${utf8.decode(imageBytes)}
-endstream
-endobj
-
-xref
-0 6
-0000000000 65535 f 
-0000000009 00000 n 
-0000000058 00000 n 
-0000000115 00000 n 
-0000000266 00000 n 
-0000000360 00000 n 
-
-trailer
-<< /Size 6 /Root 1 0 R >>
-startxref
-${500 + imageBytes.length}
-%%EOF'''));
+    final result = BytesBuilder();
+    result.add(localHeader.buffer.asUint8List());
+    result.add(fileNameBytes);
+    result.add(imageBytes);
+    result.add(centralDir.buffer.asUint8List());
+    result.add(fileNameBytes);
+    result.add(eocd.buffer.asUint8List());
+    return result.toBytes();
   }
 
-  int _nearestEven(int v) => v % 2 == 0 ? v : v + 1;
-
-  int _imageWidth(Uint8List bytes) {
-    if (bytes.length < 24) return 600;
-    if (bytes[0] == 0xFF && bytes[1] == 0xD8) {
-      int pos = 2;
-      while (pos < bytes.length - 1) {
-        if (bytes[pos] == 0xFF && bytes[pos + 1] == 0xC0) {
-          return (bytes[pos + 7] << 8) | bytes[pos + 8];
+  int _crc32(Uint8List data) {
+    int crc = 0xFFFFFFFF;
+    for (final byte in data) {
+      crc ^= byte;
+      for (int i = 0; i < 8; i++) {
+        if ((crc & 1) != 0) {
+          crc = (crc >> 1) ^ 0xEDB88320;
+        } else {
+          crc >>= 1;
         }
-        if (bytes[pos] != 0xFF) break;
-        final segLen = (bytes[pos + 2] << 8) | bytes[pos + 3];
-        pos += segLen + 2;
-        if (pos >= bytes.length) break;
       }
     }
-    return 600;
-  }
-
-  int _imageHeight(Uint8List bytes) {
-    if (bytes.length < 24) return 800;
-    if (bytes[0] == 0xFF && bytes[1] == 0xD8) {
-      int pos = 2;
-      while (pos < bytes.length - 1) {
-        if (bytes[pos] == 0xFF && bytes[pos + 1] == 0xC0) {
-          return (bytes[pos + 5] << 8) | bytes[pos + 6];
-        }
-        if (bytes[pos] != 0xFF) break;
-        final segLen = (bytes[pos + 2] << 8) | bytes[pos + 3];
-        pos += segLen + 2;
-        if (pos >= bytes.length) break;
-      }
-    }
-    return 800;
+    return crc ^ 0xFFFFFFFF;
   }
 
   Future<Map<String, dynamic>> _runDocDigitization(Uint8List pdfBytes) async {
@@ -150,7 +137,7 @@ ${500 + imageBytes.length}
       headers: headers,
       body: jsonEncode({
         'job_id': jobId,
-        'files': ['document.pdf'],
+        'files': ['document.zip'],
       }),
     );
 
@@ -161,7 +148,7 @@ ${500 + imageBytes.length}
 
     final uploadData = jsonDecode(uploadResp.body) as Map<String, dynamic>;
     final uploadUrls = uploadData['upload_urls'] as Map<String, dynamic>;
-    final fileUrl = uploadUrls['document.pdf']?['file_url'] as String?;
+    final fileUrl = uploadUrls['document.zip']?['file_url'] as String?;
     if (fileUrl == null) {
       debugPrint('No upload URL returned');
       return {};

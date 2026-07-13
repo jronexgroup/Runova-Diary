@@ -76,11 +76,14 @@ class _EditTransactionScreenState extends ConsumerState<EditTransactionScreen> {
     if (amount == null || amount <= 0) return null;
     if (!_autoCommission) return null;
     if (_original == null) return null;
-    if (_original!.type == TransactionType.cashIn || _original!.type == TransactionType.cashOut) {
-      final (_, commission) = ref.read(commissionServiceProvider).smartDetect(amount);
-      return commission;
-    }
-    return ref.read(commissionServiceProvider).calculateCommission(amount, _original!.type);
+    final cfg = _selectedAccountId != null
+        ? ref.read(commissionConfigsProvider.notifier).getAccountConfig(_selectedAccountId!)
+        : null;
+    return ref.read(commissionServiceProvider).calculateCommission(amount, _original!.type,
+        cashInRanges: cfg?.cashInRanges,
+        cashOutRanges: cfg?.cashOutRanges,
+        cashInPerThousand: cfg?.cashInPerThousand,
+        cashOutPerThousand: cfg?.cashOutPerThousand);
   }
 
   bool get _hasDetectedCommission {
@@ -214,6 +217,7 @@ class _EditTransactionScreenState extends ConsumerState<EditTransactionScreen> {
         _original!.type == TransactionType.cashOut;
     final isAEPS = _original!.type == TransactionType.aeps;
     final accounts = ref.watch(accountsProvider);
+    ref.watch(commissionConfigsProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Edit Transaction')),

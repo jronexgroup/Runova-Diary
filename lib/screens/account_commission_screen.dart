@@ -130,7 +130,7 @@ class _AccountCommissionScreenState extends ConsumerState<AccountCommissionScree
               TextFormField(
                 controller: rateCtrl,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(labelText: 'Rate (\u20B9/\u20B91,000)', isDense: true),
+                decoration: const InputDecoration(labelText: 'Commission (flat \u20B9)', isDense: true),
                 validator: (v) => v?.trim().isEmpty ?? true ? 'Required' : null,
               ),
             ],
@@ -263,7 +263,7 @@ class _AccountCommissionScreenState extends ConsumerState<AccountCommissionScree
       child: ListTile(
         dense: true,
         title: Text('\u20B9${range.min} \u2013 \u20B9${range.max}'),
-        subtitle: Text('Rate: \u20B9${range.rate.toStringAsFixed(2)}/\u20B91,000'),
+        subtitle: Text('Commission: \u20B9${range.rate.toStringAsFixed(2)} flat'),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [

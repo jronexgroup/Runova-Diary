@@ -17,13 +17,21 @@ class CommissionService {
       List<CommissionRange>? cashOutRanges}) {
     if (amount <= 0) return 0;
 
+    if (type == TransactionType.cashIn && cashInRanges != null && cashInRanges.isNotEmpty) {
+      final rangeRate = _rateFromRanges(amount, cashInRanges);
+      if (rangeRate > 0) return rangeRate;
+    }
+
+    if (type == TransactionType.cashOut && cashOutRanges != null && cashOutRanges.isNotEmpty) {
+      final rangeRate = _rateFromRanges(amount, cashOutRanges);
+      if (rangeRate > 0) return rangeRate;
+    }
+
     double perThousand;
     if (type == TransactionType.cashIn && cashInRanges != null && cashInRanges.isNotEmpty) {
-      perThousand = _rateFromRanges(amount, cashInRanges);
-      if (perThousand <= 0) perThousand = cashInPerThousand ?? 10;
+      perThousand = cashInPerThousand ?? 10;
     } else if (type == TransactionType.cashOut && cashOutRanges != null && cashOutRanges.isNotEmpty) {
-      perThousand = _rateFromRanges(amount, cashOutRanges);
-      if (perThousand <= 0) perThousand = cashOutPerThousand ?? 10;
+      perThousand = cashOutPerThousand ?? 10;
     } else {
       perThousand = switch (type) {
         TransactionType.aeps => aepsPerThousand ?? 10.0,
@@ -65,22 +73,22 @@ class CommissionService {
     final t = total.toInt();
     final tD = total.toDouble();
 
-    double rateFor(double amt) {
+    double flatRateFor(double amt) {
       final ranges = cashInRanges ?? cashOutRanges;
       if (ranges != null && ranges.isNotEmpty) {
         final match = ranges.where((r) => amt >= r.min && amt <= r.max);
         if (match.isNotEmpty) return match.first.rate;
       }
-      return 10;
+      return 0;
     }
 
-    final maxComm = ((t ~/ 1000) + 1) * rateFor(total);
-    int start = t - maxComm.toInt();
-    if (start < 0) start = 0;
-    for (int b = start; b <= t; b++) {
-      final comm = (b / 1000).ceil() * rateFor(b.toDouble());
-      if (b + comm == total) return (b.toDouble(), comm);
+    final flatComm = flatRateFor(tD);
+    if (flatComm > 0) {
+      final base = tD - flatComm;
+      if (base > 0) return (base, flatComm);
+      return (tD, 0);
     }
+
     return (tD, 0);
   }
 }
