@@ -15,7 +15,7 @@ class ShareHandlerScreen extends ConsumerStatefulWidget {
 }
 
 class _ShareHandlerScreenState extends ConsumerState<ShareHandlerScreen> {
-  String? _sharedImagePath;
+  String? _sharedFilePath;
   bool _initialized = false;
   bool _loading = false;
 
@@ -25,11 +25,18 @@ class _ShareHandlerScreenState extends ConsumerState<ShareHandlerScreen> {
     _initShareReceiver();
   }
 
+  bool get _isImage => _sharedFilePath != null && _isImageFile(_sharedFilePath!);
+
+  bool _isImageFile(String path) {
+    final ext = path.split('.').last.toLowerCase();
+    return ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp', 'heic', 'heif'].contains(ext);
+  }
+
   Future<void> _initShareReceiver() async {
     final extraPath = GoRouterState.of(context).extra as String?;
     if (extraPath != null) {
       setState(() {
-        _sharedImagePath = extraPath;
+        _sharedFilePath = extraPath;
         _initialized = true;
       });
       return;
@@ -39,7 +46,7 @@ class _ShareHandlerScreenState extends ConsumerState<ShareHandlerScreen> {
     platformStream.listen((List<SharedMediaFile> files) {
       if (files.isNotEmpty) {
         setState(() {
-          _sharedImagePath = files.first.path;
+          _sharedFilePath = files.first.path;
           _initialized = true;
         });
       }
@@ -48,7 +55,7 @@ class _ShareHandlerScreenState extends ConsumerState<ShareHandlerScreen> {
     final initialFiles = await ReceiveSharingIntent.instance.getInitialMedia();
     if (initialFiles.isNotEmpty) {
       setState(() {
-        _sharedImagePath = initialFiles.first.path;
+        _sharedFilePath = initialFiles.first.path;
         _initialized = true;
       });
       ReceiveSharingIntent.instance.reset();
@@ -68,10 +75,10 @@ class _ShareHandlerScreenState extends ConsumerState<ShareHandlerScreen> {
       );
     }
 
-    if (_sharedImagePath == null) {
+    if (_sharedFilePath == null) {
       return Scaffold(
         appBar: AppBar(title: const Text('Runova Diary')),
-        body: const Center(child: Text('No image received')),
+        body: const Center(child: Text('No file received')),
       );
     }
 
@@ -90,10 +97,12 @@ class _ShareHandlerScreenState extends ConsumerState<ShareHandlerScreen> {
           children: [
             Padding(
               padding: const EdgeInsets.all(16),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: Image.file(File(_sharedImagePath!), height: 200, fit: BoxFit.cover),
-              ),
+              child: _isImage
+                  ? ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.file(File(_sharedFilePath!), height: 200, fit: BoxFit.cover),
+                    )
+                  : Icon(Icons.description, size: 80, color: theme.colorScheme.primary),
             ),
             const SizedBox(height: 24),
             Text('Select transaction type', style: theme.textTheme.titleMedium),
@@ -124,7 +133,7 @@ class _ShareHandlerScreenState extends ConsumerState<ShareHandlerScreen> {
   }
 
   Future<void> _processWithType(TransactionType type) async {
-    if (_sharedImagePath == null) return;
+    if (_sharedFilePath == null) return;
 
     final aiSettings = ref.read(aiSettingsProvider);
     if (!aiSettings.enabled || aiSettings.apiKey.isEmpty) {
@@ -139,7 +148,7 @@ class _ShareHandlerScreenState extends ConsumerState<ShareHandlerScreen> {
 
     final accounts = ref.read(accountsProvider);
     final aiService = AiService(aiSettings);
-    final fields = await aiService.processDocument(_sharedImagePath!);
+    final fields = await aiService.processDocument(_sharedFilePath!);
 
     if (!mounted) return;
 

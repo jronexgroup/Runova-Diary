@@ -51,6 +51,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     if (user != null) {
       final initialFiles = await ReceiveSharingIntent.instance.getInitialMedia();
       if (initialFiles.isNotEmpty) {
+        ReceiveSharingIntent.instance.reset();
         if (mounted) context.go('/share-handler', extra: initialFiles.first.path);
         return;
       }
