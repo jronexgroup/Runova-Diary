@@ -169,6 +169,7 @@ class _BankAccountsScreenState extends ConsumerState<BankAccountsScreen> {
             onPressed: () async {
               if (!formKey.currentState!.validate()) return;
               final account = BankAccount.create(
+                id: existing?.id,
                 name: nameCtrl.text.trim(),
                 holderName: holderCtrl.text.trim(),
                 bankName: bankCtrl.text.trim(),

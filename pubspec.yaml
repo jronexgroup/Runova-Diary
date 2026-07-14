@@ -46,6 +46,7 @@ dependencies:
   http: ^1.2.2
   image_picker: ^1.1.2
   receive_sharing_intent: ^1.8.1
+  archive: ^4.0.2
 
 dev_dependencies:
   flutter_test:

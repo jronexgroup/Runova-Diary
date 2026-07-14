@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:archive/archive.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../models/ai_settings.dart';
@@ -147,38 +148,15 @@ class AiService {
   }
 
   String _extractTextFromZip(Uint8List zipBytes) {
-    if (zipBytes.length < 30) return '';
-
     try {
-      int pos = 0;
+      final archive = ZipDecoder().decodeBytes(zipBytes);
       final allText = StringBuffer();
-
-      while (pos < zipBytes.length - 30) {
-        if (zipBytes[pos] == 0x50 && zipBytes[pos + 1] == 0x4B &&
-            zipBytes[pos + 2] == 0x03 && zipBytes[pos + 3] == 0x04) {
-          final nameLen = (zipBytes[pos + 26] << 8) | zipBytes[pos + 27];
-          final extraLen = (zipBytes[pos + 28] << 8) | zipBytes[pos + 29];
-          final dataStart = pos + 30 + nameLen + extraLen;
-          final compressedSize = (zipBytes[pos + 18] << 8) | zipBytes[pos + 19] |
-              (zipBytes[pos + 20] << 16) | (zipBytes[pos + 21] << 24);
-
-          final name = utf8.decode(zipBytes.sublist(pos + 30, pos + 30 + nameLen));
-
-          if (!name.endsWith('/') && compressedSize > 0 && dataStart + compressedSize <= zipBytes.length) {
-            final content = utf8.decode(zipBytes.sublist(dataStart, dataStart + compressedSize));
-            if (!name.endsWith('.json')) {
-              allText.writeln(content);
-            }
-          }
-
-          final totalExtra = (zipBytes[pos + 30 - 2] << 8) | zipBytes[pos + 30 - 1];
-          pos += 30 + nameLen + extraLen + compressedSize;
-          if (totalExtra > 0) pos += totalExtra;
-        } else {
-          pos++;
+      for (final file in archive) {
+        if (file.isFile && !file.name.endsWith('.json')) {
+          final content = String.fromCharCodes(file.content);
+          allText.writeln(content);
         }
       }
-
       return allText.toString().trim();
     } catch (e) {
       debugPrint('ZIP parse error: $e');
