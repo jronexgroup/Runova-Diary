@@ -26,6 +26,15 @@ class _ShareHandlerScreenState extends ConsumerState<ShareHandlerScreen> {
   }
 
   Future<void> _initShareReceiver() async {
+    final extraPath = GoRouterState.of(context).extra as String?;
+    if (extraPath != null) {
+      setState(() {
+        _sharedImagePath = extraPath;
+        _initialized = true;
+      });
+      return;
+    }
+
     final platformStream = ReceiveSharingIntent.instance.getMediaStream();
     platformStream.listen((List<SharedMediaFile> files) {
       if (files.isNotEmpty) {
@@ -63,6 +72,13 @@ class _ShareHandlerScreenState extends ConsumerState<ShareHandlerScreen> {
       return Scaffold(
         appBar: AppBar(title: const Text('Runova Diary')),
         body: const Center(child: Text('No image received')),
+      );
+    }
+
+    if (_loading) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('New Transaction')),
+        body: const Center(child: CircularProgressIndicator()),
       );
     }
 
@@ -129,9 +145,8 @@ class _ShareHandlerScreenState extends ConsumerState<ShareHandlerScreen> {
 
     if (fields.isEmpty) {
       setState(() => _loading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not extract data from image')),
-      );
+      if (!mounted) return;
+      _showAiError(context);
       return;
     }
 
@@ -142,5 +157,34 @@ class _ShareHandlerScreenState extends ConsumerState<ShareHandlerScreen> {
       'fields': fields,
       'matchedAccountId': matchedId,
     });
+  }
+
+  void _showAiError(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('AI Extraction Failed'),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('The AI could not extract transaction details from this image. Possible causes:'),
+            SizedBox(height: 12),
+            Text('1. Image is blurry or low quality'),
+            Text('2. Receipt format not recognized'),
+            Text('3. AI service temporarily unavailable'),
+            Text('4. API key has insufficient credits'),
+            SizedBox(height: 12),
+            Text('Try with a clearer screenshot of the payment receipt.'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
   }
 }

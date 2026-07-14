@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:archive/archive.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -27,7 +26,8 @@ class AiService {
       final ocrText = await _runOcr(bytes);
       if (ocrText.isEmpty) return {};
 
-      return await _extractWithLLM(ocrText);
+      final cleanText = _cleanOcrText(ocrText);
+      return await _extractWithLLM(cleanText);
     } catch (e) {
       debugPrint('Sarvam AI request failed: $e');
       return {};
@@ -103,7 +103,7 @@ class AiService {
     }
 
     for (int i = 0; i < 10; i++) {
-      await Future.delayed(Duration(seconds: i < 3 ? 1 : 2));
+      await Future.delayed(Duration(milliseconds: i < 2 ? 500 : 1000));
 
       final statusResp = await http.get(
         Uri.parse('$_baseUrl/doc-digitization/job/v1/$jobId/status'),
@@ -164,6 +164,20 @@ class AiService {
     }
   }
 
+  String _cleanOcrText(String ocrText) {
+    final lines = ocrText.split('\n');
+    final cleaned = <String>[];
+    for (final line in lines) {
+      if (line.contains('[IMAGE]')) continue;
+      if (line.startsWith('*') && line.endsWith('*') && line.length > 20) continue;
+      cleaned.add(line);
+    }
+    return cleaned.join('\n')
+      .replaceAll(RegExp(r'!\[.*?\]\(data:image.*?\)'), '')
+      .replaceAll(RegExp(r'\n{3,}'), '\n\n')
+      .trim();
+  }
+
   Future<Map<String, dynamic>> _extractWithLLM(String ocrText) async {
     try {
       final resp = await http.post(
@@ -177,7 +191,7 @@ class AiService {
           'messages': [
             {
               'role': 'user',
-              'content': 'Extract fields from this payment receipt text and return ONLY a JSON object with these keys: customerName, amount, mobileNumber, transactionId, lastFourDigits, aadhaarNumber. If a field is not present, set it to null. Do not include any other text or explanation.\n\nText:\n$ocrText',
+              'content': 'Extract fields from this payment receipt text. Return ONLY raw JSON with keys: customerName, amount, mobileNumber, transactionId, lastFourDigits, aadhaarNumber. If a field is not present, set it to null. No reasoning, no markdown, no explanation.\n\n$ocrText',
             },
           ],
           'max_tokens': 4000,

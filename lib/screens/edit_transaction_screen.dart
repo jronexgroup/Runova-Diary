@@ -113,9 +113,8 @@ class _EditTransactionScreenState extends ConsumerState<EditTransactionScreen> {
     setState(() => _loading = false);
 
     if (fields.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not extract data from image')),
-      );
+      if (!mounted) return;
+      _showAiError(context);
       return;
     }
 
@@ -138,6 +137,35 @@ class _EditTransactionScreenState extends ConsumerState<EditTransactionScreen> {
     setState(() {});
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('AI filled ${fields.length} field(s)')),
+    );
+  }
+
+  void _showAiError(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('AI Extraction Failed'),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('The AI could not extract transaction details from this image. Possible causes:'),
+            SizedBox(height: 12),
+            Text('1. Image is blurry or low quality'),
+            Text('2. Receipt format not recognized'),
+            Text('3. AI service temporarily unavailable'),
+            Text('4. API key has insufficient credits'),
+            SizedBox(height: 12),
+            Text('Try with a clearer screenshot of the payment receipt.'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
     );
   }
 

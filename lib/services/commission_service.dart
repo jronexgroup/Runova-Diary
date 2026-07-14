@@ -70,7 +70,6 @@ class CommissionService {
 
   (double baseAmount, double commission) smartDetect(double total,
       {List<CommissionRange>? cashInRanges, List<CommissionRange>? cashOutRanges}) {
-    final t = total.toInt();
     final tD = total.toDouble();
 
     double flatRateFor(double amt) {
