@@ -108,6 +108,7 @@ class _BankAccountsScreenState extends ConsumerState<BankAccountsScreen> {
     final holderCtrl = TextEditingController(text: existing?.holderName ?? '');
     final bankCtrl = TextEditingController(text: existing?.bankName ?? '');
     final upiCtrl = TextEditingController(text: existing?.upiId ?? '');
+    final acctCtrl = TextEditingController(text: existing?.accountNumber ?? '');
     final last4Ctrl = TextEditingController(text: existing?.lastFourDigits ?? '');
     final formKey = GlobalKey<FormState>();
 
