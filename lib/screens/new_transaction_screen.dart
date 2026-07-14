@@ -9,8 +9,15 @@ import '../utils/date_utils.dart';
 
 class NewTransactionScreen extends ConsumerStatefulWidget {
   final TransactionType type;
+  final Map<String, dynamic>? initialFields;
+  final String? initialAccountId;
 
-  const NewTransactionScreen({super.key, required this.type});
+  const NewTransactionScreen({
+    super.key,
+    required this.type,
+    this.initialFields,
+    this.initialAccountId,
+  });
 
   @override
   ConsumerState<NewTransactionScreen> createState() => _NewTransactionScreenState();
@@ -40,6 +47,32 @@ class _NewTransactionScreenState extends ConsumerState<NewTransactionScreen> {
   bool _loading = false;
   bool _commissionOverridden = false;
   bool _autoCommission = true;
+
+  @override
+  void initState() {
+    super.initState();
+    final fields = widget.initialFields;
+    if (fields != null) {
+      if (fields['customerName'] != null) {
+        _customerNameController.text = fields['customerName'] as String;
+      }
+      if (fields['amount'] != null) {
+        _amountController.text = fields['amount'] as String;
+      }
+      if (fields['mobileNumber'] != null) {
+        _mobileController.text = fields['mobileNumber'] as String;
+      }
+      if (fields['transactionId'] != null) {
+        _txnIdController.text = fields['transactionId'] as String;
+      }
+      if (fields['aadhaarNumber'] != null) {
+        _aadhaarController.text = fields['aadhaarNumber'] as String;
+      }
+      if (widget.initialAccountId != null) {
+        _selectedAccountId = widget.initialAccountId;
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -101,6 +134,7 @@ class _NewTransactionScreenState extends ConsumerState<NewTransactionScreen> {
 
     setState(() => _loading = true);
 
+    final accounts = ref.read(accountsProvider);
     final aiService = AiService(aiSettings);
     final fields = await aiService.processDocument(file.path);
 
@@ -128,6 +162,11 @@ class _NewTransactionScreenState extends ConsumerState<NewTransactionScreen> {
     }
     if (fields['aadhaarNumber'] != null) {
       _aadhaarController.text = fields['aadhaarNumber'] as String;
+    }
+
+    final matchedId = aiService.matchAccountId(fields, accounts);
+    if (matchedId != null) {
+      _selectedAccountId = matchedId;
     }
 
     setState(() {});

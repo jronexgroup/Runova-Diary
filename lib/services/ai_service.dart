@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../models/ai_settings.dart';
+import '../models/bank_account.dart';
 
 class AiService {
   final AiSettings settings;
@@ -21,93 +22,18 @@ class AiService {
       if (!file.existsSync()) return {};
 
       final bytes = await file.readAsBytes();
-      final zipBytes = _imageToZip(bytes);
 
-      final result = await _runDocDigitization(zipBytes);
-      return _extractFields(result);
+      final ocrText = await _runOcr(bytes);
+      if (ocrText.isEmpty) return {};
+
+      return await _extractWithLLM(ocrText);
     } catch (e) {
       debugPrint('Sarvam AI request failed: $e');
       return {};
     }
   }
 
-  Uint8List _imageToZip(Uint8List imageBytes) {
-    final fileName = 'document.jpg';
-    final fileNameBytes = utf8.encode(fileName);
-    final crc32 = _crc32(imageBytes);
-
-    final localHeader = ByteData(30);
-    int off = 0;
-    localHeader.setUint32(off, 0x04034b50, Endian.little); off += 4;
-    localHeader.setUint16(off, 20, Endian.little); off += 2;
-    localHeader.setUint16(off, 0, Endian.little); off += 2;
-    localHeader.setUint16(off, 0, Endian.little); off += 2;
-    localHeader.setUint16(off, 0, Endian.little); off += 2;
-    localHeader.setUint16(off, 0, Endian.little); off += 2;
-    localHeader.setUint32(off, crc32, Endian.little); off += 4;
-    localHeader.setUint32(off, imageBytes.length, Endian.little); off += 4;
-    localHeader.setUint32(off, imageBytes.length, Endian.little); off += 4;
-    localHeader.setUint16(off, fileNameBytes.length, Endian.little); off += 2;
-    localHeader.setUint16(off, 0, Endian.little);
-
-    final centralDir = ByteData(46);
-    int cdOff = 0;
-    centralDir.setUint32(cdOff, 0x02014b50, Endian.little); cdOff += 4;
-    centralDir.setUint16(cdOff, 20, Endian.little); cdOff += 2;
-    centralDir.setUint16(cdOff, 20, Endian.little); cdOff += 2;
-    centralDir.setUint16(cdOff, 0, Endian.little); cdOff += 2;
-    centralDir.setUint16(cdOff, 0, Endian.little); cdOff += 2;
-    centralDir.setUint16(cdOff, 0, Endian.little); cdOff += 2;
-    centralDir.setUint32(cdOff, crc32, Endian.little); cdOff += 4;
-    centralDir.setUint32(cdOff, imageBytes.length, Endian.little); cdOff += 4;
-    centralDir.setUint32(cdOff, imageBytes.length, Endian.little); cdOff += 4;
-    centralDir.setUint16(cdOff, fileNameBytes.length, Endian.little); cdOff += 2;
-    centralDir.setUint16(cdOff, 0, Endian.little); cdOff += 2;
-    centralDir.setUint16(cdOff, 0, Endian.little); cdOff += 2;
-    centralDir.setUint16(cdOff, 0, Endian.little); cdOff += 2;
-    centralDir.setUint16(cdOff, 0, Endian.little); cdOff += 2;
-    centralDir.setUint32(cdOff, 0, Endian.little); cdOff += 4;
-    centralDir.setUint32(cdOff, 0, Endian.little);
-
-    final eocd = ByteData(22);
-    int eo = 0;
-    eocd.setUint32(eo, 0x06054b50, Endian.little); eo += 4;
-    eocd.setUint16(eo, 0, Endian.little); eo += 2;
-    eocd.setUint16(eo, 0, Endian.little); eo += 2;
-    eocd.setUint16(eo, 1, Endian.little); eo += 2;
-    eocd.setUint16(eo, 1, Endian.little); eo += 2;
-    final cdSize = 46;
-    final cdOffset = 30 + fileNameBytes.length + imageBytes.length;
-    eocd.setUint32(eo, cdSize, Endian.little); eo += 4;
-    eocd.setUint32(eo, cdOffset, Endian.little); eo += 4;
-    eocd.setUint16(eo, 0, Endian.little);
-
-    final result = BytesBuilder();
-    result.add(localHeader.buffer.asUint8List());
-    result.add(fileNameBytes);
-    result.add(imageBytes);
-    result.add(centralDir.buffer.asUint8List());
-    result.add(fileNameBytes);
-    result.add(eocd.buffer.asUint8List());
-    return result.toBytes();
-  }
-
-  int _crc32(Uint8List data) {
-    int crc = 0xFFFFFFFF;
-    for (final byte in data) {
-      crc ^= byte;
-      for (int i = 0; i < 8; i++) {
-        if ((crc & 1) != 0) {
-          crc = (crc >> 1) ^ 0xEDB88320;
-        } else {
-          crc >>= 1;
-        }
-      }
-    }
-    return crc ^ 0xFFFFFFFF;
-  }
-
-  Future<Map<String, dynamic>> _runDocDigitization(Uint8List pdfBytes) async {
+  Future<String> _runOcr(Uint8List imageBytes) async {
     final headers = {
       'api-subscription-key': settings.apiKey,
       'Content-Type': 'application/json',
@@ -126,7 +52,7 @@ class AiService {
 
     if (createResp.statusCode != 202) {
       debugPrint('Create job failed: ${createResp.statusCode} ${createResp.body}');
-      return {};
+      return '';
     }
 
     final createData = jsonDecode(createResp.body) as Map<String, dynamic>;
@@ -137,32 +63,32 @@ class AiService {
       headers: headers,
       body: jsonEncode({
         'job_id': jobId,
-        'files': ['document.zip'],
+        'files': ['document.jpg'],
       }),
     );
 
     if (uploadResp.statusCode != 200) {
       debugPrint('Get upload URLs failed: ${uploadResp.statusCode} ${uploadResp.body}');
-      return {};
+      return '';
     }
 
     final uploadData = jsonDecode(uploadResp.body) as Map<String, dynamic>;
     final uploadUrls = uploadData['upload_urls'] as Map<String, dynamic>;
-    final fileUrl = uploadUrls['document.zip']?['file_url'] as String?;
+    final fileUrl = uploadUrls['document.jpg']?['file_url'] as String?;
     if (fileUrl == null) {
       debugPrint('No upload URL returned');
-      return {};
+      return '';
     }
 
     final putResp = await http.put(
       Uri.parse(fileUrl),
       headers: {'x-ms-blob-type': 'BlockBlob'},
-      body: pdfBytes,
+      body: imageBytes,
     );
 
     if (putResp.statusCode != 201) {
       debugPrint('File upload failed: ${putResp.statusCode}');
-      return {};
+      return '';
     }
 
     final startResp = await http.post(
@@ -172,7 +98,7 @@ class AiService {
 
     if (startResp.statusCode != 202) {
       debugPrint('Start job failed: ${startResp.statusCode} ${startResp.body}');
-      return {};
+      return '';
     }
 
     for (int i = 0; i < 30; i++) {
@@ -196,39 +122,36 @@ class AiService {
 
         if (downloadResp.statusCode != 200) {
           debugPrint('Download failed: ${downloadResp.statusCode}');
-          return {};
+          return '';
         }
 
         final downloadData = jsonDecode(downloadResp.body) as Map<String, dynamic>;
         final dlUrls = downloadData['download_urls'] as Map<String, dynamic>;
         final dlUrl = dlUrls.values.first?['file_url'] as String?;
-        if (dlUrl == null) return {};
+        if (dlUrl == null) return '';
 
         final zipResp = await http.get(Uri.parse(dlUrl));
-        if (zipResp.statusCode != 200) return {};
+        if (zipResp.statusCode != 200) return '';
 
-        final zipBytes = zipResp.bodyBytes;
-        return _parseZipOutput(zipBytes);
+        return _extractTextFromZip(zipResp.bodyBytes);
       }
 
       if (jobState == 'Failed') {
-        debugPrint('Job failed');
-        return {};
+        debugPrint('OCR job failed');
+        return '';
       }
     }
 
-    debugPrint('Job timed out');
-    return {};
+    debugPrint('OCR job timed out');
+    return '';
   }
 
-  Map<String, dynamic> _parseZipOutput(Uint8List zipBytes) {
-    final extracted = <String, dynamic>{};
-    if (zipBytes.length < 30) return extracted;
+  String _extractTextFromZip(Uint8List zipBytes) {
+    if (zipBytes.length < 30) return '';
 
     try {
       int pos = 0;
       final allText = StringBuffer();
-      String? jsonContent;
 
       while (pos < zipBytes.length - 30) {
         if (zipBytes[pos] == 0x50 && zipBytes[pos + 1] == 0x4B &&
@@ -243,9 +166,7 @@ class AiService {
 
           if (!name.endsWith('/') && compressedSize > 0 && dataStart + compressedSize <= zipBytes.length) {
             final content = utf8.decode(zipBytes.sublist(dataStart, dataStart + compressedSize));
-            if (name.endsWith('.json')) {
-              jsonContent = content;
-            } else {
+            if (!name.endsWith('.json')) {
               allText.writeln(content);
             }
           }
@@ -258,98 +179,79 @@ class AiService {
         }
       }
 
-      if (jsonContent != null) {
-        try {
-          final jsonData = jsonDecode(jsonContent) as Map<String, dynamic>;
-          extracted.addAll(jsonData);
-          final pages = jsonData['pages'] as List?;
-          if (pages != null && pages.isNotEmpty) {
-            final pageTexts = <String>[];
-            for (final page in pages) {
-              if (page is Map<String, dynamic>) {
-                final text = page['text'] as String? ?? page['markdown'] as String? ?? '';
-                if (text.isNotEmpty) pageTexts.add(text);
-              }
-            }
-            if (pageTexts.isNotEmpty) {
-              extracted['text'] = pageTexts.join('\n');
-            }
-          }
-        } catch (_) {}
-      }
-
-      if (extracted['text'] == null) {
-        final text = allText.toString();
-        if (text.isNotEmpty) extracted['text'] = text;
-      }
+      return allText.toString().trim();
     } catch (e) {
       debugPrint('ZIP parse error: $e');
+      return '';
     }
-
-    return extracted;
   }
 
-  Map<String, dynamic> _extractFields(Map<String, dynamic> raw) {
-    final Map<String, dynamic> fields = {};
-
+  Future<Map<String, dynamic>> _extractWithLLM(String ocrText) async {
     try {
-      final text = (raw['text'] as String?) ??
-          (raw['extracted_text'] as String?) ??
-          (raw['ocr_text'] as String?) ??
-          '';
-      if (text.isEmpty) return fields;
+      final resp = await http.post(
+        Uri.parse('$_baseUrl/v1/chat/completions'),
+        headers: {
+          'api-subscription-key': settings.apiKey,
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'model': 'sarvam-105b',
+          'messages': [
+            {
+              'role': 'user',
+              'content': 'Extract fields from this payment receipt text and return ONLY a JSON object with these keys: customerName, amount, mobileNumber, transactionId, lastFourDigits, aadhaarNumber. If a field is not present, set it to null. Do not include any other text or explanation.\n\nText:\n$ocrText',
+            },
+          ],
+          'max_tokens': 4000,
+        }),
+      );
 
-      final lines = text.split('\n').map((l) => l.trim()).where((l) => l.isNotEmpty).toList();
+      if (resp.statusCode != 200) {
+        debugPrint('LLM extraction failed: ${resp.statusCode} ${resp.body}');
+        return {};
+      }
 
-      for (final line in lines) {
-        final lower = line.toLowerCase();
+      final data = jsonDecode(resp.body) as Map<String, dynamic>;
+      final choices = data['choices'] as List?;
+      if (choices == null || choices.isEmpty) return {};
 
-        if (fields['customerName'] == null &&
-            (lower.startsWith('name:') || lower.startsWith('customer:') || lower.startsWith('customer name:'))) {
-          final val = line.split(':').skip(1).join(':').trim();
-          if (val.isNotEmpty && val.length < 100) fields['customerName'] = val;
-        }
+      final message = choices[0]['message'] as Map<String, dynamic>?;
+      final content = message?['content'] as String?;
+      if (content == null || content.isEmpty) return {};
 
-        if (fields['amount'] == null) {
-          final amtMatch = RegExp(r'(?:amount|amt|rs\.?|₹|total)\s*:?\s*([\d,]+\.?\d*)', caseSensitive: false)
-              .firstMatch(lower);
-          if (amtMatch != null) {
-            final raw = amtMatch.group(1)!.replaceAll(',', '');
-            final val = double.tryParse(raw);
-            if (val != null && val > 0 && val < 99999999) {
-              fields['amount'] = raw;
-            }
+      final jsonMatch = RegExp(r'\{.*\}', dotAll: true).firstMatch(content);
+      if (jsonMatch == null) {
+        debugPrint('No JSON found in LLM response');
+        return {};
+      }
+
+      final fields = jsonDecode(jsonMatch.group(0)!) as Map<String, dynamic>;
+      final result = <String, dynamic>{};
+      for (final entry in fields.entries) {
+        if (entry.value != null && entry.value.toString().isNotEmpty) {
+          var val = entry.value.toString();
+          if (entry.key == 'amount') {
+            val = val.replaceAll(RegExp(r'[₹,\s]'), '');
+          } else if (entry.key == 'lastFourDigits') {
+            final last4 = RegExp(r'(\d{4})$').firstMatch(val);
+            if (last4 != null) val = last4.group(1)!;
           }
-        }
-
-        if (fields['mobileNumber'] == null) {
-          final mobileMatch = RegExp(r'\b[6-9]\d{9}\b').firstMatch(line);
-          if (mobileMatch != null) {
-            fields['mobileNumber'] = mobileMatch.group(0);
-          }
-        }
-
-        if (fields['transactionId'] == null) {
-          final txnMatch = RegExp(
-            r'(?:txn\s*id|transaction\s*(?:id|no|number)|ref\s*(?:id|no|number)|utr)\s*:?\s*([A-Za-z0-9]{6,})',
-            caseSensitive: false,
-          ).firstMatch(line);
-          if (txnMatch != null) {
-            fields['transactionId'] = txnMatch.group(1);
-          }
-        }
-
-        if (fields['aadhaarNumber'] == null) {
-          final aadhaarMatch = RegExp(r'\b\d{4}\s?\d{4}\s?\d{4}\b').firstMatch(line);
-          if (aadhaarMatch != null) {
-            fields['aadhaarNumber'] = aadhaarMatch.group(0)!.replaceAll(' ', '');
-          }
+          result[entry.key] = val;
         }
       }
+      return result;
     } catch (e) {
-      debugPrint('Field extraction error: $e');
+      debugPrint('LLM extraction error: $e');
+      return {};
     }
+  }
 
-    return fields;
+  String? matchAccountId(Map<String, dynamic> fields, List<BankAccount> accounts) {
+    final last4 = fields['lastFourDigits'] as String?;
+    if (last4 == null || last4.isEmpty) return null;
+    for (final acc in accounts) {
+      if (acc.lastFourDigits == last4) return acc.id;
+    }
+    return null;
   }
 }

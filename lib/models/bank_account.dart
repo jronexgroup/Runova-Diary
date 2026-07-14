@@ -11,6 +11,7 @@ class BankAccount {
   final String bankName;
   final String? upiId;
   final String? accountNumber;
+  final String? lastFourDigits;
   final bool isActive;
 
   const BankAccount({
@@ -20,6 +21,7 @@ class BankAccount {
     required this.bankName,
     this.upiId,
     this.accountNumber,
+    this.lastFourDigits,
     this.isActive = true,
   });
 
@@ -30,6 +32,7 @@ class BankAccount {
     String? bankName,
     String? upiId,
     String? accountNumber,
+    String? lastFourDigits,
     bool? isActive,
   }) {
     return BankAccount(
@@ -39,6 +42,7 @@ class BankAccount {
       bankName: bankName ?? this.bankName,
       upiId: upiId ?? this.upiId,
       accountNumber: accountNumber ?? this.accountNumber,
+      lastFourDigits: lastFourDigits ?? this.lastFourDigits,
       isActive: isActive ?? this.isActive,
     );
   }
@@ -50,6 +54,7 @@ class BankAccount {
     'bankName': bankName,
     'upiId': upiId,
     'accountNumber': accountNumber,
+    'lastFourDigits': lastFourDigits,
     'isActive': isActive,
   };
 
@@ -61,6 +66,7 @@ class BankAccount {
       bankName: json['bankName'] as String? ?? '',
       upiId: json['upiId'] as String?,
       accountNumber: json['accountNumber'] as String?,
+      lastFourDigits: json['lastFourDigits'] as String?,
       isActive: json['isActive'] as bool? ?? true,
     );
   }
@@ -72,6 +78,7 @@ class BankAccount {
     required String bankName,
     String? upiId,
     String? accountNumber,
+    String? lastFourDigits,
     bool isActive = true,
   }) {
     return BankAccount(
@@ -81,6 +88,7 @@ class BankAccount {
       bankName: bankName,
       upiId: upiId,
       accountNumber: accountNumber,
+      lastFourDigits: lastFourDigits,
       isActive: isActive,
     );
   }

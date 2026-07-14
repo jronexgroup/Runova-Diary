@@ -108,7 +108,7 @@ class _BankAccountsScreenState extends ConsumerState<BankAccountsScreen> {
     final holderCtrl = TextEditingController(text: existing?.holderName ?? '');
     final bankCtrl = TextEditingController(text: existing?.bankName ?? '');
     final upiCtrl = TextEditingController(text: existing?.upiId ?? '');
-    final acctCtrl = TextEditingController(text: existing?.accountNumber ?? '');
+    final last4Ctrl = TextEditingController(text: existing?.lastFourDigits ?? '');
     final formKey = GlobalKey<FormState>();
 
     await showDialog(
@@ -147,6 +147,17 @@ class _BankAccountsScreenState extends ConsumerState<BankAccountsScreen> {
                   controller: acctCtrl,
                   decoration: const InputDecoration(labelText: 'Account Number (optional)', prefixIcon: Icon(Icons.numbers)),
                 ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: last4Ctrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Last 4 Digits (optional)',
+                    prefixIcon: Icon(Icons.dialpad),
+                    helperText: 'Used by AI to auto-select this account',
+                  ),
+                  keyboardType: TextInputType.number,
+                  maxLength: 4,
+                ),
               ],
             ),
           ),
@@ -162,6 +173,7 @@ class _BankAccountsScreenState extends ConsumerState<BankAccountsScreen> {
                 bankName: bankCtrl.text.trim(),
                 upiId: upiCtrl.text.trim().isEmpty ? null : upiCtrl.text.trim(),
                 accountNumber: acctCtrl.text.trim().isEmpty ? null : acctCtrl.text.trim(),
+                lastFourDigits: last4Ctrl.text.trim().isEmpty ? null : last4Ctrl.text.trim(),
               );
               if (existing != null && index != null) {
                 await ref.read(accountsProvider.notifier).updateAccount(index, account, userId);
