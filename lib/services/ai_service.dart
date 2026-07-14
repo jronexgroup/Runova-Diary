@@ -102,8 +102,8 @@ class AiService {
       return '';
     }
 
-    for (int i = 0; i < 30; i++) {
-      await Future.delayed(Duration(seconds: i < 5 ? 2 : 5));
+    for (int i = 0; i < 10; i++) {
+      await Future.delayed(Duration(seconds: i < 3 ? 1 : 2));
 
       final statusResp = await http.get(
         Uri.parse('$_baseUrl/doc-digitization/job/v1/$jobId/status'),

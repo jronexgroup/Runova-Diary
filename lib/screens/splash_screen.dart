@@ -35,17 +35,21 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
 
     if (!mounted) return;
 
-    final initialFiles = await ReceiveSharingIntent.instance.getInitialMedia();
-    if (initialFiles.isNotEmpty) {
-      ReceiveSharingIntent.instance.reset();
-      if (mounted) context.go('/share-handler');
-      return;
-    }
-
     final user = ref.read(authServiceProvider).getCurrentUser();
     if (user != null) {
       ref.read(authProvider.notifier).setUser(user);
       ref.read(syncServiceProvider).syncFromFirebase();
+    }
+
+    if (!mounted) return;
+
+    if (user != null) {
+      final initialFiles = await ReceiveSharingIntent.instance.getInitialMedia();
+      if (initialFiles.isNotEmpty) {
+        ReceiveSharingIntent.instance.reset();
+        if (mounted) context.go('/share-handler');
+        return;
+      }
       if (mounted) context.go('/dashboard');
     } else {
       if (mounted) context.go('/login');
