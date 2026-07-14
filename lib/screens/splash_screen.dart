@@ -38,6 +38,11 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     final user = ref.read(authServiceProvider).getCurrentUser();
     if (user != null) {
       ref.read(authProvider.notifier).setUser(user);
+      ref.read(transactionsProvider.notifier).loadTransactions(user.id);
+      ref.read(balancesProvider.notifier).loadBalances(user.id);
+      await ref.read(accountsProvider.notifier).load(user.id);
+      ref.read(commissionConfigsProvider.notifier).load(user.id);
+      ref.read(aiSettingsProvider.notifier).load(user.id);
       ref.read(syncServiceProvider).syncFromFirebase();
     }
 
