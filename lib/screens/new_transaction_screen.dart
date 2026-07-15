@@ -136,17 +136,18 @@ class _NewTransactionScreenState extends ConsumerState<NewTransactionScreen> {
 
     final accounts = ref.read(accountsProvider);
     final aiService = AiService(aiSettings);
-    final fields = await aiService.processDocument(file.path);
+    final result = await aiService.processDocument(file.path);
 
     if (!mounted) return;
     setState(() => _loading = false);
 
-    if (fields.isEmpty) {
+    if (!result.isSuccess) {
       if (!mounted) return;
-      _showAiError(context);
+      _showAiError(context, result.error ?? 'Unknown error');
       return;
     }
 
+    final fields = result.fields;
     if (fields['customerName'] != null) {
       _customerNameController.text = fields['customerName'] as String;
     }
@@ -174,24 +175,30 @@ class _NewTransactionScreenState extends ConsumerState<NewTransactionScreen> {
     );
   }
 
-  void _showAiError(BuildContext context) {
+  void _showAiError(BuildContext context, String errorMessage) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('AI Extraction Failed'),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('The AI could not extract transaction details from this image. Possible causes:'),
-            SizedBox(height: 12),
-            Text('1. Image is blurry or low quality'),
-            Text('2. Receipt format not recognized'),
-            Text('3. AI service temporarily unavailable'),
-            Text('4. API key has insufficient credits'),
-            SizedBox(height: 12),
-            Text('Try with a clearer screenshot of the payment receipt.'),
-          ],
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('The AI could not extract transaction details.'),
+              const SizedBox(height: 12),
+              Text(errorMessage, style: TextStyle(color: Colors.red.shade700)),
+              const SizedBox(height: 12),
+              const Text('Possible causes:'),
+              const SizedBox(height: 8),
+              const Text('1. Image is blurry or low quality'),
+              const Text('2. Receipt format not recognized'),
+              const Text('3. AI service temporarily unavailable'),
+              const Text('4. API key has insufficient credits'),
+              const SizedBox(height: 12),
+              const Text('Try with a clearer screenshot of the payment receipt.'),
+            ],
+          ),
         ),
         actions: [
           TextButton(
