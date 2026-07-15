@@ -137,11 +137,18 @@ class _EditTransactionScreenState extends ConsumerState<EditTransactionScreen> {
     if (fields['aadhaarNumber'] != null) {
       _aadhaarController.text = fields['aadhaarNumber'] as String;
     }
+    if (fields['bankName'] != null) {
+      _bankNameController.text = fields['bankName'] as String;
+    }
 
     setState(() {});
+    final msg = result.switched
+        ? 'AI filled ${fields.length} field(s) (switched to Sarvam)'
+        : 'AI filled ${fields.length} field(s)';
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('AI filled ${fields.length} field(s)')),
+      SnackBar(content: Text(msg)),
     );
+  }
   }
 
   void _showAiError(BuildContext context, String errorMessage) {

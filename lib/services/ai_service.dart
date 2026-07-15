@@ -10,8 +10,9 @@ class AiResult {
   final Map<String, dynamic> fields;
   final String? error;
   final String provider;
+  final bool switched;
 
-  AiResult({required this.fields, this.error, this.provider = 'unknown'});
+  AiResult({required this.fields, this.error, this.provider = 'unknown', this.switched = false});
 
   bool get isSuccess => fields.isNotEmpty && error == null;
   bool get isEmpty => fields.isEmpty && error == null;
@@ -59,7 +60,11 @@ class AiService {
         return AiResult(fields: {}, error: 'No AI provider available. Configure Gemini or Sarvam API key in Settings.');
       }
 
-      return await _processWithSarvam(bytes, filePath);
+      final sarvamResult = await _processWithSarvam(bytes, filePath);
+      if (settings.geminiApiKey.isNotEmpty) {
+        return AiResult(fields: sarvamResult.fields, error: sarvamResult.error, provider: 'sarvam', switched: true);
+      }
+      return sarvamResult;
     } catch (e) {
       debugPrint('[AI] processDocument exception: $e');
       return AiResult(fields: {}, error: 'AI processing error: $e');
@@ -79,7 +84,7 @@ class AiService {
         "contents": [
           {
             "parts": [
-              {"text": "Extract fields from this payment receipt image. Return ONLY raw JSON with keys: customerName, amount, mobileNumber, transactionId, lastFourDigits, aadhaarNumber. If a field is not present, set it to null. No reasoning, no markdown, no explanation."},
+              {"text": "Extract fields from this payment receipt image. Return ONLY raw JSON with keys: customerName, amount, mobileNumber, transactionId, lastFourDigits, aadhaarNumber, bankName. If a field is not present, set it to null. No reasoning, no markdown, no explanation."},
               {
                 "inline_data": {
                   "mime_type": mimeType,
@@ -415,7 +420,7 @@ class AiService {
           'messages': [
             {
               'role': 'user',
-              'content': 'Extract fields from this payment receipt text. Return ONLY raw JSON with keys: customerName, amount, mobileNumber, transactionId, lastFourDigits, aadhaarNumber. If a field is not present, set it to null. No reasoning, no markdown, no explanation.\n\n$ocrText',
+              'content': 'Extract fields from this payment receipt text. Return ONLY raw JSON with keys: customerName, amount, mobileNumber, transactionId, lastFourDigits, aadhaarNumber, bankName. If a field is not present, set it to null. No reasoning, no markdown, no explanation.\n\n$ocrText',
             },
           ],
           'max_tokens': 4000,

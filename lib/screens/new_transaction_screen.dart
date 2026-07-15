@@ -68,6 +68,9 @@ class _NewTransactionScreenState extends ConsumerState<NewTransactionScreen> {
       if (fields['aadhaarNumber'] != null) {
         _aadhaarController.text = fields['aadhaarNumber'] as String;
       }
+      if (fields['bankName'] != null) {
+        _bankNameController.text = fields['bankName'] as String;
+      }
       if (widget.initialAccountId != null) {
         _selectedAccountId = widget.initialAccountId;
       }
@@ -163,6 +166,9 @@ class _NewTransactionScreenState extends ConsumerState<NewTransactionScreen> {
     if (fields['aadhaarNumber'] != null) {
       _aadhaarController.text = fields['aadhaarNumber'] as String;
     }
+    if (fields['bankName'] != null) {
+      _bankNameController.text = fields['bankName'] as String;
+    }
 
     final matchedId = aiService.matchAccountId(fields, accounts);
     if (matchedId != null) {
@@ -170,8 +176,11 @@ class _NewTransactionScreenState extends ConsumerState<NewTransactionScreen> {
     }
 
     setState(() {});
+    final msg = result.switched
+        ? 'AI filled ${fields.length} field(s) (switched to Sarvam)'
+        : 'AI filled ${fields.length} field(s)';
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('AI filled ${fields.length} field(s)')),
+      SnackBar(content: Text(msg)),
     );
   }
 
@@ -278,7 +287,11 @@ class _NewTransactionScreenState extends ConsumerState<NewTransactionScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Transaction recorded')),
       );
-      context.pop();
+      if (widget.initialFields != null) {
+        context.go('/home');
+      } else {
+        context.pop();
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() => _loading = false);
