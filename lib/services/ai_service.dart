@@ -86,7 +86,7 @@ class AiService {
     }
   }
 
-  Uint8List _compressImage(Uint8List bytes, {int maxDimension = 800, int quality = 70}) {
+  Uint8List _compressImage(Uint8List bytes, {int maxDimension = 640, int quality = 50}) {
     try {
       final original = img.decodeImage(bytes);
       if (original == null) return bytes;
@@ -95,7 +95,8 @@ class AiService {
       if (original.width > maxDimension || original.height > maxDimension) {
         resized = img.copyResize(original,
             width: original.width > original.height ? maxDimension : null,
-            height: original.height >= original.width ? maxDimension : null);
+            height: original.height >= original.width ? maxDimension : null,
+            interpolation: img.Interpolation.nearest);
       }
 
       final compressed = img.encodeJpg(resized, quality: quality);
