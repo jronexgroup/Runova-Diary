@@ -3,8 +3,20 @@ import 'dart:io';
 import 'package:archive/archive.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:image/image.dart' as img;
 import '../models/ai_settings.dart';
 import '../models/bank_account.dart';
+
+enum AiProgressStep {
+  readingImage,
+  compressing,
+  sendingToAi,
+  parsingResponse,
+  fillingFields,
+  done,
+}
+
+typedef AiProgressCallback = void Function(AiProgressStep step, String message);
 
 class AiResult {
   final Map<String, dynamic> fields;
@@ -24,7 +36,7 @@ class AiService {
 
   AiService(this.settings);
 
-  Future<AiResult> processDocument(String filePath) async {
+  Future<AiResult> processDocument(String filePath, {AiProgressCallback? onProgress}) async {
     if (!settings.enabled) {
       debugPrint('[AI] AI disabled');
       return AiResult(fields: {}, error: 'AI is not configured. Enable in Settings > AI Settings.');
@@ -33,6 +45,7 @@ class AiService {
     debugPrint('[AI] processDocument called with filePath: $filePath');
 
     try {
+      onProgress?.call(AiProgressStep.readingImage, 'Reading image...');
       final file = File(filePath);
       if (!file.existsSync()) {
         debugPrint('[AI] File does not exist: $filePath');
@@ -45,7 +58,7 @@ class AiService {
       // Try Gemini first (primary provider)
       if (settings.geminiApiKey.isNotEmpty) {
         debugPrint('[AI] Trying Gemini (primary provider)...');
-        final geminiResult = await _processWithGemini(bytes);
+        final geminiResult = await _processWithGemini(bytes, onProgress: onProgress);
         if (geminiResult.isSuccess) {
           debugPrint('[AI] Gemini succeeded');
           return geminiResult;
@@ -71,8 +84,31 @@ class AiService {
     }
   }
 
-  Future<AiResult> _processWithGemini(Uint8List imageBytes) async {
-    debugPrint('[AI] Gemini: Sending image to Gemini Vision API...');
+  Uint8List _compressImage(Uint8List bytes, {int maxDimension = 1024, int quality = 80}) {
+    try {
+      final original = img.decodeImage(bytes);
+      if (original == null) return bytes;
+
+      img.Image resized = original;
+      if (original.width > maxDimension || original.height > maxDimension) {
+        resized = img.copyResize(original,
+            width: original.width > original.height ? maxDimension : null,
+            height: original.height >= original.width ? maxDimension : null);
+      }
+
+      final compressed = img.encodeJpg(resized, quality: quality);
+      debugPrint('[AI] Compressed image: ${bytes.length} -> ${compressed.length} bytes');
+      return Uint8List.fromList(compressed);
+    } catch (e) {
+      debugPrint('[AI] Image compression failed, using original: $e');
+      return bytes;
+    }
+  }
+
+  Future<AiResult> _processWithGemini(Uint8List imageBytes, {AiProgressCallback? onProgress}) async {
+    onProgress?.call(AiProgressStep.compressing, 'Compressing image...');
+    imageBytes = _compressImage(imageBytes);
+    onProgress?.call(AiProgressStep.sendingToAi, 'Sending to Gemini...');
 
     try {
       final base64Image = base64Encode(imageBytes);
@@ -123,6 +159,7 @@ class AiService {
         return AiResult(fields: {}, error: 'Gemini error: $errorMsg');
       }
 
+      onProgress?.call(AiProgressStep.parsingResponse, 'Parsing AI response...');
       final data = jsonDecode(resp.body) as Map<String, dynamic>;
       final candidates = data['candidates'] as List?;
       if (candidates == null || candidates.isEmpty) {

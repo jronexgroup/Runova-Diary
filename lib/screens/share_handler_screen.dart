@@ -6,6 +6,7 @@ import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 import '../providers/providers.dart';
 import '../services/ai_service.dart';
 import '../utils/constants.dart';
+import '../widgets/ai_roadmap_dialog.dart';
 
 class ShareHandlerScreen extends ConsumerStatefulWidget {
   const ShareHandlerScreen({super.key});
@@ -144,22 +145,35 @@ class _ShareHandlerScreenState extends ConsumerState<ShareHandlerScreen> {
       return;
     }
 
-    setState(() => _loading = true);
+    if (!mounted) return;
+    final progressNotifier = ValueNotifier<AiProgressData>(
+      const AiProgressData(step: AiProgressStep.readingImage, message: 'Reading image...'),
+    );
+    AiRoadmapDialog.show(context, progressNotifier);
 
+    setState(() => _loading = true);
     final accounts = ref.read(accountsProvider);
     final aiService = AiService(aiSettings);
-    final result = await aiService.processDocument(_sharedFilePath!);
+    final result = await aiService.processDocument(
+      _sharedFilePath!,
+      onProgress: (step, msg) {
+        progressNotifier.value = AiProgressData(step: step, message: msg);
+      },
+    );
 
     if (!mounted) return;
 
     if (!result.isSuccess) {
       setState(() => _loading = false);
+      progressNotifier.value = const AiProgressData(step: AiProgressStep.done, message: 'Done!');
       if (!mounted) return;
       _showAiError(context, result.error ?? 'Unknown error');
       return;
     }
 
+    progressNotifier.value = const AiProgressData(step: AiProgressStep.fillingFields, message: 'Filling fields...');
     final matchedId = aiService.matchAccountId(result.fields, accounts);
+    progressNotifier.value = const AiProgressData(step: AiProgressStep.done, message: 'Done!');
 
     if (!mounted) return;
     context.go('/new-transaction/${type.name}', extra: {
