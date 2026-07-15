@@ -176,10 +176,12 @@ class _ShareHandlerScreenState extends ConsumerState<ShareHandlerScreen> {
     progressNotifier.value = const AiProgressData(step: AiProgressStep.done, message: 'Done!');
 
     if (!mounted) return;
-    context.go('/new-transaction/${type.name}', extra: {
+    await context.push('/new-transaction/${type.name}', extra: {
       'fields': result.fields,
       'matchedAccountId': matchedId,
     });
+    if (!mounted) return;
+    Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
   void _showAiError(BuildContext context, String errorMessage) {

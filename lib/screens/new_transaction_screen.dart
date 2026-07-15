@@ -6,6 +6,7 @@ import '../providers/providers.dart';
 import '../services/ai_service.dart';
 import '../utils/constants.dart';
 import '../utils/date_utils.dart';
+import '../widgets/ai_roadmap_dialog.dart';
 
 class NewTransactionScreen extends ConsumerStatefulWidget {
   final TransactionType type;
@@ -135,11 +136,21 @@ class _NewTransactionScreenState extends ConsumerState<NewTransactionScreen> {
     final file = await picker.pickImage(source: ImageSource.gallery);
     if (file == null) return;
 
-    setState(() => _loading = true);
+    if (!mounted) return;
+    final progressNotifier = ValueNotifier<AiProgressData>(
+      const AiProgressData(step: AiProgressStep.readingImage, message: 'Reading image...'),
+    );
+    AiRoadmapDialog.show(context, progressNotifier);
 
+    setState(() => _loading = true);
     final accounts = ref.read(accountsProvider);
     final aiService = AiService(aiSettings);
-    final result = await aiService.processDocument(file.path);
+    final result = await aiService.processDocument(
+      file.path,
+      onProgress: (step, msg) {
+        progressNotifier.value = AiProgressData(step: step, message: msg);
+      },
+    );
 
     if (!mounted) return;
     setState(() => _loading = false);
@@ -150,6 +161,7 @@ class _NewTransactionScreenState extends ConsumerState<NewTransactionScreen> {
       return;
     }
 
+    progressNotifier.value = const AiProgressData(step: AiProgressStep.fillingFields, message: 'Filling fields...');
     final fields = result.fields;
     if (fields['customerName'] != null) {
       _customerNameController.text = fields['customerName'] as String;
@@ -182,6 +194,7 @@ class _NewTransactionScreenState extends ConsumerState<NewTransactionScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(msg)),
     );
+    progressNotifier.value = const AiProgressData(step: AiProgressStep.done, message: 'Done!');
   }
 
   void _showAiError(BuildContext context, String errorMessage) {
@@ -287,11 +300,7 @@ class _NewTransactionScreenState extends ConsumerState<NewTransactionScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Transaction recorded')),
       );
-      if (widget.initialFields != null) {
-        context.go('/home');
-      } else {
-        context.pop();
-      }
+      context.pop();
     } catch (e) {
       if (!mounted) return;
       setState(() => _loading = false);

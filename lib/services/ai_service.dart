@@ -33,6 +33,8 @@ class AiResult {
 class AiService {
   final AiSettings settings;
   static const _sarvamBaseUrl = 'https://api.sarvam.ai';
+  static const _geminiBaseUrl = 'https://generativelanguage.googleapis.com/v1/models';
+  static final http.Client _httpClient = http.Client();
 
   AiService(this.settings);
 
@@ -84,7 +86,7 @@ class AiService {
     }
   }
 
-  Uint8List _compressImage(Uint8List bytes, {int maxDimension = 1024, int quality = 80}) {
+  Uint8List _compressImage(Uint8List bytes, {int maxDimension = 800, int quality = 70}) {
     try {
       final original = img.decodeImage(bytes);
       if (original == null) return bytes;
@@ -114,7 +116,7 @@ class AiService {
       final base64Image = base64Encode(imageBytes);
       final mimeType = _detectMimeType(imageBytes);
 
-      final url = 'https://generativelanguage.googleapis.com/v1/models/gemini-3.5-flash:generateContent?key=${settings.geminiApiKey}';
+      final url = '$_geminiBaseUrl/gemini-3.5-flash:generateContent?key=${settings.geminiApiKey}';
 
       final body = jsonEncode({
         "contents": [
@@ -136,7 +138,7 @@ class AiService {
         }
       });
 
-      final resp = await http.post(
+      final resp = await _httpClient.post(
         Uri.parse(url),
         headers: {'Content-Type': 'application/json'},
         body: body,
