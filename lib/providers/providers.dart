@@ -512,7 +512,7 @@ class AiSettingsNotifier extends StateNotifier<AiSettings> {
     if (json != null) {
       try {
         final parsed = AiSettings.fromJson(jsonDecode(json) as Map<String, dynamic>);
-        state = parsed.copyWith(enabled: parsed.apiKey.isNotEmpty);
+        state = parsed.copyWith(enabled: parsed.apiKey.isNotEmpty || parsed.geminiApiKey.isNotEmpty);
         return;
       } catch (_) {}
     }
@@ -525,7 +525,12 @@ class AiSettingsNotifier extends StateNotifier<AiSettings> {
   }
 
   Future<void> setApiKey(String key, String userId) async {
-    state = state.copyWith(apiKey: key, enabled: key.isNotEmpty);
+    state = state.copyWith(apiKey: key, enabled: key.isNotEmpty || state.geminiApiKey.isNotEmpty);
+    await save(userId);
+  }
+
+  Future<void> setGeminiApiKey(String key, String userId) async {
+    state = state.copyWith(geminiApiKey: key, enabled: key.isNotEmpty || state.apiKey.isNotEmpty);
     await save(userId);
   }
 
@@ -535,7 +540,7 @@ class AiSettingsNotifier extends StateNotifier<AiSettings> {
   }
 
   Future<void> update(AiSettings updated, String userId) async {
-    state = updated.copyWith(enabled: updated.apiKey.isNotEmpty);
+    state = updated.copyWith(enabled: updated.apiKey.isNotEmpty || updated.geminiApiKey.isNotEmpty);
     await save(userId);
   }
 }

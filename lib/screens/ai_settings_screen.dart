@@ -14,19 +14,23 @@ class AiSettingsScreen extends ConsumerStatefulWidget {
 class _AiSettingsScreenState extends ConsumerState<AiSettingsScreen> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _apiKeyCtrl;
+  late TextEditingController _geminiApiKeyCtrl;
   bool _saving = false;
   bool _obscureKey = true;
+  bool _obscureGeminiKey = true;
 
   @override
   void initState() {
     super.initState();
     final s = ref.read(aiSettingsProvider);
     _apiKeyCtrl = TextEditingController(text: s.apiKey);
+    _geminiApiKeyCtrl = TextEditingController(text: s.geminiApiKey);
   }
 
   @override
   void dispose() {
     _apiKeyCtrl.dispose();
+    _geminiApiKeyCtrl.dispose();
     super.dispose();
   }
 
@@ -38,7 +42,8 @@ class _AiSettingsScreenState extends ConsumerState<AiSettingsScreen> {
 
     final updated = AiSettings(
       apiKey: _apiKeyCtrl.text.trim(),
-      enabled: _apiKeyCtrl.text.trim().isNotEmpty,
+      geminiApiKey: _geminiApiKeyCtrl.text.trim(),
+      enabled: _apiKeyCtrl.text.trim().isNotEmpty || _geminiApiKeyCtrl.text.trim().isNotEmpty,
     );
 
     await ref.read(aiSettingsProvider.notifier).update(updated, user.id);
@@ -65,7 +70,7 @@ class _AiSettingsScreenState extends ConsumerState<AiSettingsScreen> {
             Card(
               child: SwitchListTile(
                 title: const Text('Enable AI Processing'),
-                subtitle: const Text('Use Sarvam AI to auto-fill transaction forms'),
+                subtitle: const Text('Use AI to auto-fill transaction forms'),
                 value: aiEnabled,
                 onChanged: (v) {
                   ref.read(aiSettingsProvider.notifier).setEnabled(v, userId);
@@ -77,7 +82,7 @@ class _AiSettingsScreenState extends ConsumerState<AiSettingsScreen> {
               controller: _apiKeyCtrl,
               obscureText: _obscureKey,
               decoration: InputDecoration(
-                labelText: 'Sarvam AI API Key',
+                labelText: 'Sarvam AI API Key (fallback)',
                 prefixIcon: const Icon(Icons.key),
                 suffixIcon: IconButton(
                   icon: Icon(_obscureKey ? Icons.visibility_off : Icons.visibility),
@@ -85,8 +90,27 @@ class _AiSettingsScreenState extends ConsumerState<AiSettingsScreen> {
                 ),
               ),
               validator: (v) {
-                if (aiEnabled && (v?.trim().isEmpty ?? true)) {
-                  return 'API key required when AI is enabled';
+                if (aiEnabled && _geminiApiKeyCtrl.text.trim().isEmpty && (v?.trim().isEmpty ?? true)) {
+                  return 'At least one API key required when AI is enabled';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _geminiApiKeyCtrl,
+              obscureText: _obscureGeminiKey,
+              decoration: InputDecoration(
+                labelText: 'Gemini API Key (primary)',
+                prefixIcon: const Icon(Icons.auto_awesome),
+                suffixIcon: IconButton(
+                  icon: Icon(_obscureGeminiKey ? Icons.visibility_off : Icons.visibility),
+                  onPressed: () => setState(() => _obscureGeminiKey = !_obscureGeminiKey),
+                ),
+              ),
+              validator: (v) {
+                if (aiEnabled && _apiKeyCtrl.text.trim().isEmpty && (v?.trim().isEmpty ?? true)) {
+                  return 'At least one API key required when AI is enabled';
                 }
                 return null;
               },
@@ -102,11 +126,13 @@ class _AiSettingsScreenState extends ConsumerState<AiSettingsScreen> {
                         style: Theme.of(context).textTheme.titleMedium),
                     const SizedBox(height: 8),
                     const Text(
-                      '1. Enter your Sarvam AI API key above\n'
+                      '1. Enter your Gemini API key (primary) and/or Sarvam AI API key (fallback)\n'
                       '2. AI will auto-enable when a key is saved\n'
                       '3. On any New Transaction screen, tap the AI button\n'
                       '4. Upload an image or document\n'
-                      '5. AI will auto-fill the form fields',
+                      '5. AI will auto-fill the form fields\n'
+                      '\n'
+                      'Gemini is used by default (faster). Falls back to Sarvam if unavailable.',
                       style: TextStyle(fontSize: 13),
                     ),
                   ],
