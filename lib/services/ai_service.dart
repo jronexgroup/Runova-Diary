@@ -98,7 +98,11 @@ class AiService {
           final geminiResult = await _processWithGemini(bytes, key, onProgress: onProgress);
           if (geminiResult.isSuccess) {
             debugPrint('[AI] Gemini (key ${i + 1}) succeeded');
-            return geminiResult;
+            return AiResult(
+              fields: geminiResult.fields,
+              provider: 'gemini',
+              monitorInfo: AiMonitorInfo(provider: 'gemini', keyIndex: i, totalKeys: geminiKeys.length),
+            );
           }
           final isQuotaExhausted = geminiResult.error?.contains('429') == true ||
               geminiResult.error?.contains('rate limited') == true ||
@@ -202,6 +206,8 @@ class AiService {
         }
       });
 
+      final stopwatch = Stopwatch()..start();
+      debugPrint('[AI] Gemini: Sending POST request...');
       final resp = await _httpClient.post(
         Uri.parse(url),
         headers: {
@@ -209,7 +215,8 @@ class AiService {
           'x-goog-api-key': apiKey,
         },
         body: body,
-      );
+      ).timeout(const Duration(seconds: 25));
+      debugPrint('[AI] Gemini: Response received in ${stopwatch.elapsedMilliseconds}ms, status=${resp.statusCode}');
 
       if (resp.statusCode == 429) {
         debugPrint('[AI] Gemini: Rate limited (429).');
