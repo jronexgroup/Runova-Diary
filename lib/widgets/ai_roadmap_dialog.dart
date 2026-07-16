@@ -3,14 +3,26 @@ import '../services/ai_service.dart';
 
 class AiRoadmapDialog extends StatefulWidget {
   final ValueNotifier<AiProgressData> progressNotifier;
+  final ValueNotifier<AiMonitorInfo> monitorNotifier;
 
-  const AiRoadmapDialog({super.key, required this.progressNotifier});
+  const AiRoadmapDialog({
+    super.key,
+    required this.progressNotifier,
+    required this.monitorNotifier,
+  });
 
-  static Future<void> show(BuildContext context, ValueNotifier<AiProgressData> notifier) {
+  static Future<void> show(
+    BuildContext context,
+    ValueNotifier<AiProgressData> progressNotifier,
+    ValueNotifier<AiMonitorInfo> monitorNotifier,
+  ) {
     return showDialog<void>(
       context: context,
       barrierDismissible: false,
-      builder: (_) => AiRoadmapDialog(progressNotifier: notifier),
+      builder: (_) => AiRoadmapDialog(
+        progressNotifier: progressNotifier,
+        monitorNotifier: monitorNotifier,
+      ),
     );
   }
 
@@ -30,11 +42,13 @@ class _AiRoadmapDialogState extends State<AiRoadmapDialog> {
   void initState() {
     super.initState();
     widget.progressNotifier.addListener(_onProgress);
+    widget.monitorNotifier.addListener(_onMonitor);
   }
 
   @override
   void dispose() {
     widget.progressNotifier.removeListener(_onProgress);
+    widget.monitorNotifier.removeListener(_onMonitor);
     super.dispose();
   }
 
@@ -47,9 +61,14 @@ class _AiRoadmapDialogState extends State<AiRoadmapDialog> {
     setState(() {});
   }
 
+  void _onMonitor() {
+    setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
     final currentStep = widget.progressNotifier.value.step;
+    final monitorInfo = widget.monitorNotifier.value;
     final steps = [
       (AiProgressStep.readingImage, 'Reading image'),
       (AiProgressStep.compressing, 'Compressing'),
@@ -67,7 +86,56 @@ class _AiRoadmapDialogState extends State<AiRoadmapDialog> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const SizedBox(height: 8),
+            if (currentStep != AiProgressStep.readingImage &&
+                currentStep != AiProgressStep.done) ...[
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: monitorInfo.provider == 'gemini'
+                      ? Colors.blue.shade50
+                      : Colors.orange.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: monitorInfo.provider == 'gemini'
+                        ? Colors.blue.shade200
+                        : Colors.orange.shade200,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      monitorInfo.provider == 'gemini'
+                          ? Icons.auto_awesome
+                          : Icons.cloud,
+                      size: 16,
+                      color: monitorInfo.provider == 'gemini'
+                          ? Colors.blue
+                          : Colors.orange,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      monitorInfo.displayLabel,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: monitorInfo.provider == 'gemini'
+                            ? Colors.blue.shade700
+                            : Colors.orange.shade700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (monitorInfo.switchReason != null) ...[
+                const SizedBox(height: 4),
+                Text(
+                  monitorInfo.switchReason!,
+                  style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                ),
+              ],
+              const SizedBox(height: 12),
+            ],
             ...List.generate(steps.length, (i) {
               final step = steps[i];
               final isActive = i == currentIndex;

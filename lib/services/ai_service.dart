@@ -18,13 +18,43 @@ enum AiProgressStep {
 
 typedef AiProgressCallback = void Function(AiProgressStep step, String message);
 
+class AiMonitorInfo {
+  final String provider;
+  final int keyIndex;
+  final int totalKeys;
+  final String? switchReason;
+
+  const AiMonitorInfo({
+    this.provider = 'unknown',
+    this.keyIndex = 0,
+    this.totalKeys = 0,
+    this.switchReason,
+  });
+
+  String get displayLabel {
+    if (provider == 'gemini') {
+      return 'Gemini Key ${keyIndex + 1}/$totalKeys';
+    }
+    return 'Sarvam AI';
+  }
+}
+
+typedef AiMonitorCallback = void Function(AiMonitorInfo info);
+
 class AiResult {
   final Map<String, dynamic> fields;
   final String? error;
   final String provider;
   final bool switched;
+  final AiMonitorInfo monitorInfo;
 
-  AiResult({required this.fields, this.error, this.provider = 'unknown', this.switched = false});
+  AiResult({
+    required this.fields,
+    this.error,
+    this.provider = 'unknown',
+    this.switched = false,
+    this.monitorInfo = const AiMonitorInfo(),
+  });
 
   bool get isSuccess => fields.isNotEmpty && error == null;
   bool get isEmpty => fields.isEmpty && error == null;
@@ -35,8 +65,9 @@ class AiService {
   static const _sarvamBaseUrl = 'https://api.sarvam.ai';
   static const _geminiBaseUrl = 'https://generativelanguage.googleapis.com/v1/models';
   static final http.Client _httpClient = http.Client();
+  final AiMonitorCallback? onMonitor;
 
-  AiService(this.settings);
+  AiService(this.settings, {this.onMonitor});
 
   Future<AiResult> processDocument(String filePath, {AiProgressCallback? onProgress}) async {
     if (!settings.enabled) {
@@ -57,17 +88,33 @@ class AiService {
       final bytes = await file.readAsBytes();
       debugPrint('[AI] Read ${bytes.length} bytes from file');
 
-      // Try Gemini first (primary provider)
-      if (settings.geminiApiKey.isNotEmpty) {
-        debugPrint('[AI] Trying Gemini (primary provider)...');
-        final geminiResult = await _processWithGemini(bytes, onProgress: onProgress);
-        if (geminiResult.isSuccess) {
-          debugPrint('[AI] Gemini succeeded');
-          return geminiResult;
+      // Try each Gemini key in order
+      final geminiKeys = settings.geminiApiKeys.where((k) => k.isNotEmpty).toList();
+      if (geminiKeys.isNotEmpty) {
+        for (int i = 0; i < geminiKeys.length; i++) {
+          final key = geminiKeys[i];
+          debugPrint('[AI] Trying Gemini (key ${i + 1}/${geminiKeys.length})...');
+          _emitMonitor('gemini', i, geminiKeys.length, i > 0 ? 'Gemini Key ${i + 1} (previous key failed)' : null);
+          final geminiResult = await _processWithGemini(bytes, key, onProgress: onProgress);
+          if (geminiResult.isSuccess) {
+            debugPrint('[AI] Gemini (key ${i + 1}) succeeded');
+            return geminiResult;
+          }
+          final isQuotaExhausted = geminiResult.error?.contains('429') == true ||
+              geminiResult.error?.contains('rate limited') == true ||
+              geminiResult.error?.contains('quota') == true ||
+              geminiResult.error?.contains('RESOURCE_EXHAUSTED') == true;
+          if (!isQuotaExhausted && i < geminiKeys.length - 1) {
+            debugPrint('[AI] Gemini (key ${i + 1}) non-quota error: ${geminiResult.error}. Trying next key...');
+          } else if (isQuotaExhausted) {
+            debugPrint('[AI] Gemini (key ${i + 1}) quota exhausted. Trying next key...');
+          }
         }
-        debugPrint('[AI] Gemini failed: ${geminiResult.error}. Falling back to Sarvam...');
+        // All Gemini keys exhausted
+        debugPrint('[AI] All Gemini keys exhausted. Falling back to Sarvam...');
+        _emitMonitor('sarvam', 0, 0, 'All Gemini keys exhausted');
       } else {
-        debugPrint('[AI] No Gemini API key configured, using Sarvam directly');
+        debugPrint('[AI] No Gemini API keys configured, using Sarvam directly');
       }
 
       // Fallback to Sarvam
@@ -76,14 +123,30 @@ class AiService {
       }
 
       final sarvamResult = await _processWithSarvam(bytes, filePath);
-      if (settings.geminiApiKey.isNotEmpty) {
-        return AiResult(fields: sarvamResult.fields, error: sarvamResult.error, provider: 'sarvam', switched: true);
+      if (settings.hasGeminiKeys) {
+        return AiResult(
+          fields: sarvamResult.fields,
+          error: sarvamResult.error,
+          provider: 'sarvam',
+          switched: true,
+          monitorInfo: AiMonitorInfo(provider: 'sarvam'),
+        );
       }
       return sarvamResult;
     } catch (e) {
       debugPrint('[AI] processDocument exception: $e');
       return AiResult(fields: {}, error: 'AI processing error: $e');
     }
+  }
+
+  void _emitMonitor(String provider, int keyIndex, int totalKeys, [String? switchReason]) {
+    final info = AiMonitorInfo(
+      provider: provider,
+      keyIndex: keyIndex,
+      totalKeys: totalKeys,
+      switchReason: switchReason,
+    );
+    onMonitor?.call(info);
   }
 
   Uint8List _compressImage(Uint8List bytes, {int maxDimension = 640, int quality = 50}) {
@@ -108,7 +171,7 @@ class AiService {
     }
   }
 
-  Future<AiResult> _processWithGemini(Uint8List imageBytes, {AiProgressCallback? onProgress}) async {
+  Future<AiResult> _processWithGemini(Uint8List imageBytes, String apiKey, {AiProgressCallback? onProgress}) async {
     onProgress?.call(AiProgressStep.compressing, 'Compressing image...');
     imageBytes = _compressImage(imageBytes);
     onProgress?.call(AiProgressStep.sendingToAi, 'Sending to Gemini...');
@@ -117,7 +180,7 @@ class AiService {
       final base64Image = base64Encode(imageBytes);
       final mimeType = _detectMimeType(imageBytes);
 
-      final url = '$_geminiBaseUrl/gemini-3.5-flash:generateContent?key=${settings.geminiApiKey}';
+      final url = '$_geminiBaseUrl/gemini-3.5-flash:generateContent?key=$apiKey';
 
       final body = jsonEncode({
         "contents": [
@@ -146,8 +209,8 @@ class AiService {
       );
 
       if (resp.statusCode == 429) {
-        debugPrint('[AI] Gemini: Rate limited (429). Will fall back to Sarvam.');
-        return AiResult(fields: {}, error: 'Gemini rate limited');
+        debugPrint('[AI] Gemini: Rate limited (429).');
+        return AiResult(fields: {}, error: 'Gemini 429 rate limited');
       }
 
       if (resp.statusCode != 200) {
@@ -156,6 +219,9 @@ class AiService {
           final errBody = jsonDecode(resp.body);
           if (errBody is Map && errBody['error'] is Map) {
             errorMsg = errBody['error']['message'] ?? errorMsg;
+            if ((errBody['error']['status'] as String?) == 'RESOURCE_EXHAUSTED') {
+              return AiResult(fields: {}, error: 'Gemini 429 quota exhausted');
+            }
           }
         } catch (_) {}
         debugPrint('[AI] Gemini failed: ${resp.statusCode} $errorMsg');

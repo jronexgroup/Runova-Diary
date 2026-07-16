@@ -124,7 +124,7 @@ class _NewTransactionScreenState extends ConsumerState<NewTransactionScreen> {
 
   Future<void> _processAi() async {
     final aiSettings = ref.read(aiSettingsProvider);
-    if (!aiSettings.enabled || aiSettings.apiKey.isEmpty) {
+    if (!aiSettings.enabled || (!aiSettings.hasGeminiKeys && aiSettings.apiKey.isEmpty)) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('AI not configured. Enable in Settings > AI Settings')),
@@ -140,11 +140,14 @@ class _NewTransactionScreenState extends ConsumerState<NewTransactionScreen> {
     final progressNotifier = ValueNotifier<AiProgressData>(
       const AiProgressData(step: AiProgressStep.readingImage, message: 'Reading image...'),
     );
-    AiRoadmapDialog.show(context, progressNotifier);
+    final monitorNotifier = ValueNotifier<AiMonitorInfo>(const AiMonitorInfo());
+    AiRoadmapDialog.show(context, progressNotifier, monitorNotifier);
 
     setState(() => _loading = true);
     final accounts = ref.read(accountsProvider);
-    final aiService = AiService(aiSettings);
+    final aiService = AiService(aiSettings, onMonitor: (info) {
+      monitorNotifier.value = info;
+    });
     final result = await aiService.processDocument(
       file.path,
       onProgress: (step, msg) {
@@ -156,6 +159,7 @@ class _NewTransactionScreenState extends ConsumerState<NewTransactionScreen> {
     setState(() => _loading = false);
 
     if (!result.isSuccess) {
+      progressNotifier.value = const AiProgressData(step: AiProgressStep.done, message: 'Done!');
       if (!mounted) return;
       _showAiError(context, result.error ?? 'Unknown error');
       return;
@@ -188,9 +192,12 @@ class _NewTransactionScreenState extends ConsumerState<NewTransactionScreen> {
     }
 
     setState(() {});
+    final monitorLabel = result.monitorInfo.provider == 'gemini'
+        ? result.monitorInfo.displayLabel
+        : 'Sarvam AI';
     final msg = result.switched
         ? 'AI filled ${fields.length} field(s) (switched to Sarvam)'
-        : 'AI filled ${fields.length} field(s)';
+        : 'AI filled ${fields.length} field(s) via $monitorLabel';
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(msg)),
     );
