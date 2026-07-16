@@ -63,7 +63,7 @@ class AiResult {
 class AiService {
   final AiSettings settings;
   static const _sarvamBaseUrl = 'https://api.sarvam.ai';
-  static const _geminiBaseUrl = 'https://generativelanguage.googleapis.com/v1/models';
+  static const _geminiBaseUrl = 'https://generativelanguage.googleapis.com/v1beta/models';
   static final http.Client _httpClient = http.Client();
   final AiMonitorCallback? onMonitor;
 
@@ -180,7 +180,7 @@ class AiService {
       final base64Image = base64Encode(imageBytes);
       final mimeType = _detectMimeType(imageBytes);
 
-      final url = '$_geminiBaseUrl/gemini-3.5-flash:generateContent?key=$apiKey';
+      final url = '$_geminiBaseUrl/gemini-3.5-flash:generateContent';
 
       final body = jsonEncode({
         "contents": [
@@ -204,7 +204,10 @@ class AiService {
 
       final resp = await _httpClient.post(
         Uri.parse(url),
-        headers: {'Content-Type': 'application/json'},
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': apiKey,
+        },
         body: body,
       );
 
