@@ -68,11 +68,10 @@ class _AiRoadmapDialogState extends State<AiRoadmapDialog> {
   @override
   Widget build(BuildContext context) {
     final currentStep = widget.progressNotifier.value.step;
-    final monitorInfo = widget.monitorNotifier.value;
     final steps = [
       (AiProgressStep.readingImage, 'Reading image'),
       (AiProgressStep.compressing, 'Compressing'),
-      (AiProgressStep.sendingToAi, 'Sending to AI'),
+      (AiProgressStep.sendingToAi, 'Sending to NVIDIA NIM'),
       (AiProgressStep.parsingResponse, 'Parsing response'),
       (AiProgressStep.fillingFields, 'Filling fields'),
     ];
@@ -91,49 +90,26 @@ class _AiRoadmapDialogState extends State<AiRoadmapDialog> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: monitorInfo.provider == 'gemini'
-                      ? Colors.blue.shade50
-                      : Colors.orange.shade50,
+                  color: Colors.green.shade50,
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: monitorInfo.provider == 'gemini'
-                        ? Colors.blue.shade200
-                        : Colors.orange.shade200,
-                  ),
+                  border: Border.all(color: Colors.green.shade200),
                 ),
-                child: Row(
+                child: const Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
-                      monitorInfo.provider == 'gemini'
-                          ? Icons.auto_awesome
-                          : Icons.cloud,
-                      size: 16,
-                      color: monitorInfo.provider == 'gemini'
-                          ? Colors.blue
-                          : Colors.orange,
-                    ),
-                    const SizedBox(width: 6),
+                    Icon(Icons.auto_awesome, size: 16, color: Colors.green),
+                    SizedBox(width: 6),
                     Text(
-                      monitorInfo.displayLabel,
+                      'NVIDIA NIM',
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: monitorInfo.provider == 'gemini'
-                            ? Colors.blue.shade700
-                            : Colors.orange.shade700,
+                        color: Colors.green,
                       ),
                     ),
                   ],
                 ),
               ),
-              if (monitorInfo.switchReason != null) ...[
-                const SizedBox(height: 4),
-                Text(
-                  monitorInfo.switchReason!,
-                  style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
-                ),
-              ],
               const SizedBox(height: 12),
             ],
             ...List.generate(steps.length, (i) {
@@ -185,7 +161,7 @@ class _AiRoadmapDialogState extends State<AiRoadmapDialog> {
     switch (widget.progressNotifier.value.step) {
       case AiProgressStep.readingImage: return 'Reading image from device...';
       case AiProgressStep.compressing: return 'Compressing image...';
-      case AiProgressStep.sendingToAi: return 'Sending to AI provider...';
+      case AiProgressStep.sendingToAi: return 'Sending to NVIDIA NIM...';
       case AiProgressStep.parsingResponse: return 'Parsing AI response...';
       case AiProgressStep.fillingFields: return 'Filling fields...';
       case AiProgressStep.done: return 'Done!';

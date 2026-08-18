@@ -124,7 +124,7 @@ class _NewTransactionScreenState extends ConsumerState<NewTransactionScreen> {
 
   Future<void> _processAi() async {
     final aiSettings = ref.read(aiSettingsProvider);
-    if (!aiSettings.enabled || (!aiSettings.hasGeminiKeys && aiSettings.apiKey.isEmpty)) {
+    if (!aiSettings.enabled || aiSettings.apiKey.isEmpty) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('AI not configured. Enable in Settings > AI Settings')),
@@ -192,12 +192,7 @@ class _NewTransactionScreenState extends ConsumerState<NewTransactionScreen> {
     }
 
     setState(() {});
-    final monitorLabel = result.monitorInfo.provider == 'gemini'
-        ? result.monitorInfo.displayLabel
-        : 'Sarvam AI';
-    final msg = result.switched
-        ? 'AI filled ${fields.length} field(s) (switched to Sarvam)'
-        : 'AI filled ${fields.length} field(s) via $monitorLabel';
+    final msg = 'AI filled ${fields.length} field(s)';
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(msg)),
     );

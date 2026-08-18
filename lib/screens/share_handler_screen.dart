@@ -137,7 +137,7 @@ class _ShareHandlerScreenState extends ConsumerState<ShareHandlerScreen> {
     if (_sharedFilePath == null) return;
 
     final aiSettings = ref.read(aiSettingsProvider);
-    if (!aiSettings.enabled || (!aiSettings.hasGeminiKeys && aiSettings.apiKey.isEmpty)) {
+    if (!aiSettings.enabled || aiSettings.apiKey.isEmpty) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('AI not configured. Enable in Settings > AI Settings')),

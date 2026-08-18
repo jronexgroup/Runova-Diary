@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:archive/archive.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:image/image.dart' as img;
@@ -25,18 +24,13 @@ class AiMonitorInfo {
   final String? switchReason;
 
   const AiMonitorInfo({
-    this.provider = 'unknown',
+    this.provider = 'nim',
     this.keyIndex = 0,
     this.totalKeys = 0,
     this.switchReason,
   });
 
-  String get displayLabel {
-    if (provider == 'gemini') {
-      return 'Gemini Key ${keyIndex + 1}/$totalKeys';
-    }
-    return 'Sarvam AI';
-  }
+  String get displayLabel => 'NVIDIA NIM';
 }
 
 typedef AiMonitorCallback = void Function(AiMonitorInfo info);
@@ -51,7 +45,7 @@ class AiResult {
   AiResult({
     required this.fields,
     this.error,
-    this.provider = 'unknown',
+    this.provider = 'nim',
     this.switched = false,
     this.monitorInfo = const AiMonitorInfo(),
   });
@@ -62,10 +56,25 @@ class AiResult {
 
 class AiService {
   final AiSettings settings;
-  static const _sarvamBaseUrl = 'https://api.sarvam.ai';
-  static const _geminiBaseUrl = 'https://generativelanguage.googleapis.com/v1beta/models';
+  static const _baseUrl = 'https://integrate.api.nvidia.com/v1';
+  static const _model = 'nvidia/llama-3.1-nemotron-nano-vl-8b-v1';
+  static const _maxDimension = 640;
+  static const _jpegQuality = 50;
   static final http.Client _httpClient = http.Client();
   final AiMonitorCallback? onMonitor;
+
+  static const _prompt =
+      'Extract payment details from this receipt image. Return ONLY raw JSON:\n'
+      '{\n'
+      '  "customerName": "name of the person who paid or received",\n'
+      '  "amount": "payment amount as number (no currency symbol)",\n'
+      '  "mobileNumber": "10-digit phone number. Check UPI IDs like name@okaxis, name@ybl — extract the phone digits if visible",\n'
+      '  "transactionId": "unique transaction/reference ID",\n'
+      '  "lastFourDigits": "last 4 digits of the bank account or card number shown",\n'
+      '  "aadhaarNumber": "12-digit Aadhaar number if visible",\n'
+      '  "bankName": "bank name like State Bank of India, Punjab National Bank, etc."\n'
+      '}\n'
+      'If a field is not visible, set it to null. No explanation, no markdown.';
 
   AiService(this.settings, {this.onMonitor});
 
@@ -88,85 +97,45 @@ class AiService {
       final bytes = await file.readAsBytes();
       debugPrint('[AI] Read ${bytes.length} bytes from file');
 
-      // Try each Gemini key in order
-      final geminiKeys = settings.geminiApiKeys.where((k) => k.isNotEmpty).toList();
-      if (geminiKeys.isNotEmpty) {
-        for (int i = 0; i < geminiKeys.length; i++) {
-          final key = geminiKeys[i];
-          debugPrint('[AI] Trying Gemini (key ${i + 1}/${geminiKeys.length})...');
-          _emitMonitor('gemini', i, geminiKeys.length, i > 0 ? 'Gemini Key ${i + 1} (previous key failed)' : null);
-          final geminiResult = await _processWithGemini(bytes, key, onProgress: onProgress);
-          if (geminiResult.isSuccess) {
-            debugPrint('[AI] Gemini (key ${i + 1}) succeeded');
-            return AiResult(
-              fields: geminiResult.fields,
-              provider: 'gemini',
-              monitorInfo: AiMonitorInfo(provider: 'gemini', keyIndex: i, totalKeys: geminiKeys.length),
-            );
-          }
-          final isQuotaExhausted = geminiResult.error?.contains('429') == true ||
-              geminiResult.error?.contains('rate limited') == true ||
-              geminiResult.error?.contains('quota') == true ||
-              geminiResult.error?.contains('RESOURCE_EXHAUSTED') == true;
-          if (!isQuotaExhausted && i < geminiKeys.length - 1) {
-            debugPrint('[AI] Gemini (key ${i + 1}) non-quota error: ${geminiResult.error}. Trying next key...');
-          } else if (isQuotaExhausted) {
-            debugPrint('[AI] Gemini (key ${i + 1}) quota exhausted. Trying next key...');
-          }
-        }
-        // All Gemini keys exhausted
-        debugPrint('[AI] All Gemini keys exhausted. Falling back to Sarvam...');
-        _emitMonitor('sarvam', 0, 0, 'All Gemini keys exhausted');
-      } else {
-        debugPrint('[AI] No Gemini API keys configured, using Sarvam directly');
+      onProgress?.call(AiProgressStep.compressing, 'Compressing image...');
+      final compressed = _compressImage(bytes);
+      debugPrint('[AI] Compressed to ${compressed.length} bytes');
+
+      onProgress?.call(AiProgressStep.sendingToAi, 'Sending to NVIDIA NIM...');
+      _emitMonitor();
+
+      final result = await _callNvidiaNim(compressed, onProgress: onProgress);
+      if (result.isSuccess) {
+        debugPrint('[AI] NVIDIA NIM succeeded');
+        return result;
       }
 
-      // Fallback to Sarvam
-      if (settings.apiKey.isEmpty) {
-        return AiResult(fields: {}, error: 'No AI provider available. Configure Gemini or Sarvam API key in Settings.');
-      }
-
-      final sarvamResult = await _processWithSarvam(bytes, filePath);
-      if (settings.hasGeminiKeys) {
-        return AiResult(
-          fields: sarvamResult.fields,
-          error: sarvamResult.error,
-          provider: 'sarvam',
-          switched: true,
-          monitorInfo: AiMonitorInfo(provider: 'sarvam'),
-        );
-      }
-      return sarvamResult;
+      debugPrint('[AI] NVIDIA NIM failed: ${result.error}');
+      return result;
     } catch (e) {
       debugPrint('[AI] processDocument exception: $e');
       return AiResult(fields: {}, error: 'AI processing error: $e');
     }
   }
 
-  void _emitMonitor(String provider, int keyIndex, int totalKeys, [String? switchReason]) {
-    final info = AiMonitorInfo(
-      provider: provider,
-      keyIndex: keyIndex,
-      totalKeys: totalKeys,
-      switchReason: switchReason,
-    );
-    onMonitor?.call(info);
+  void _emitMonitor() {
+    onMonitor?.call(const AiMonitorInfo());
   }
 
-  Uint8List _compressImage(Uint8List bytes, {int maxDimension = 640, int quality = 50}) {
+  Uint8List _compressImage(Uint8List bytes) {
     try {
       final original = img.decodeImage(bytes);
       if (original == null) return bytes;
 
       img.Image resized = original;
-      if (original.width > maxDimension || original.height > maxDimension) {
+      if (original.width > _maxDimension || original.height > _maxDimension) {
         resized = img.copyResize(original,
-            width: original.width > original.height ? maxDimension : null,
-            height: original.height >= original.width ? maxDimension : null,
+            width: original.width > original.height ? _maxDimension : null,
+            height: original.height >= original.width ? _maxDimension : null,
             interpolation: img.Interpolation.nearest);
       }
 
-      final compressed = img.encodeJpg(resized, quality: quality);
+      final compressed = img.encodeJpg(resized, quality: _jpegQuality);
       debugPrint('[AI] Compressed image: ${bytes.length} -> ${compressed.length} bytes');
       return Uint8List.fromList(compressed);
     } catch (e) {
@@ -175,412 +144,83 @@ class AiService {
     }
   }
 
-  Future<AiResult> _processWithGemini(Uint8List imageBytes, String apiKey, {AiProgressCallback? onProgress}) async {
-    onProgress?.call(AiProgressStep.compressing, 'Compressing image...');
-    imageBytes = _compressImage(imageBytes);
-    onProgress?.call(AiProgressStep.sendingToAi, 'Sending to Gemini...');
-
+  Future<AiResult> _callNvidiaNim(Uint8List imageBytes, {AiProgressCallback? onProgress}) async {
     try {
       final base64Image = base64Encode(imageBytes);
-      final mimeType = _detectMimeType(imageBytes);
-
-      final url = '$_geminiBaseUrl/gemini-3.5-flash:generateContent';
 
       final body = jsonEncode({
-        "contents": [
+        'model': _model,
+        'messages': [
           {
-            "parts": [
-              {"text": "Extract fields from this payment receipt image. Return ONLY raw JSON with keys: customerName, amount, mobileNumber, transactionId, lastFourDigits, aadhaarNumber, bankName. If a field is not present, set it to null. No reasoning, no markdown, no explanation."},
+            'role': 'user',
+            'content': [
+              {'type': 'text', 'text': _prompt},
               {
-                "inline_data": {
-                  "mime_type": mimeType,
-                  "data": base64Image
-                }
-              }
-            ]
-          }
+                'type': 'image_url',
+                'image_url': {'url': 'data:image/jpeg;base64,$base64Image'}
+              },
+            ],
+          },
         ],
-        "generationConfig": {
-          "temperature": 0.1,
-          "maxOutputTokens": 1024
-        }
+        'max_tokens': 512,
+        'temperature': 0.1,
       });
 
       final stopwatch = Stopwatch()..start();
-      debugPrint('[AI] Gemini: Sending POST request...');
-      final resp = await _httpClient.post(
-        Uri.parse(url),
-        headers: {
-          'Content-Type': 'application/json',
-          'x-goog-api-key': apiKey,
-        },
-        body: body,
-      ).timeout(const Duration(seconds: 25));
-      debugPrint('[AI] Gemini: Response received in ${stopwatch.elapsedMilliseconds}ms, status=${resp.statusCode}');
+      debugPrint('[AI] NVIDIA NIM: Sending POST request...');
+      final resp = await _httpClient
+          .post(
+            Uri.parse('$_baseUrl/chat/completions'),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer ${settings.apiKey}',
+            },
+            body: body,
+          )
+          .timeout(const Duration(seconds: 30));
+      debugPrint('[AI] NVIDIA NIM: Response received in ${stopwatch.elapsedMilliseconds}ms, status=${resp.statusCode}');
 
       if (resp.statusCode == 429) {
-        debugPrint('[AI] Gemini: Rate limited (429).');
-        return AiResult(fields: {}, error: 'Gemini 429 rate limited');
+        debugPrint('[AI] NVIDIA NIM: Rate limited (429).');
+        return AiResult(fields: {}, error: 'Rate limited. Please try again shortly.');
       }
 
       if (resp.statusCode != 200) {
-        String errorMsg = 'Gemini request failed';
+        String errorMsg = 'NVIDIA NIM request failed';
         try {
           final errBody = jsonDecode(resp.body);
           if (errBody is Map && errBody['error'] is Map) {
             errorMsg = errBody['error']['message'] ?? errorMsg;
-            if ((errBody['error']['status'] as String?) == 'RESOURCE_EXHAUSTED') {
-              return AiResult(fields: {}, error: 'Gemini 429 quota exhausted');
-            }
           }
         } catch (_) {}
-        debugPrint('[AI] Gemini failed: ${resp.statusCode} $errorMsg');
-        return AiResult(fields: {}, error: 'Gemini error: $errorMsg');
+        debugPrint('[AI] NVIDIA NIM failed: ${resp.statusCode} $errorMsg');
+        return AiResult(fields: {}, error: 'AI error ($resp.statusCode): $errorMsg');
       }
 
       onProgress?.call(AiProgressStep.parsingResponse, 'Parsing AI response...');
       final data = jsonDecode(resp.body) as Map<String, dynamic>;
-      final candidates = data['candidates'] as List?;
-      if (candidates == null || candidates.isEmpty) {
-        debugPrint('[AI] Gemini: No candidates in response');
-        return AiResult(fields: {}, error: 'Gemini returned no candidates');
-      }
-
-      final content = candidates[0]['content']?['parts']?[0]?['text'] as String?;
-      if (content == null || content.isEmpty) {
-        debugPrint('[AI] Gemini: Empty response content');
-        return AiResult(fields: {}, error: 'Gemini returned empty response');
-      }
-
-      debugPrint('[AI] Gemini raw response: $content');
-
-      final jsonMatch = RegExp(r'\{.*\}', dotAll: true).firstMatch(content);
-      if (jsonMatch == null) {
-        debugPrint('[AI] Gemini: No JSON found in response');
-        return AiResult(fields: {}, error: 'Gemini response did not contain valid JSON');
-      }
-
-      final jsonStr = jsonMatch.group(0)!;
-      debugPrint('[AI] Gemini extracted JSON: $jsonStr');
-
-      final fields = jsonDecode(jsonStr) as Map<String, dynamic>;
-      final result = <String, dynamic>{};
-      for (final entry in fields.entries) {
-        if (entry.value != null && entry.value.toString().isNotEmpty) {
-          var val = entry.value.toString();
-          if (entry.key == 'amount') {
-            val = val.replaceAll(RegExp(r'[₹,\s]'), '');
-          } else if (entry.key == 'lastFourDigits') {
-            final last4 = RegExp(r'(\d{4})$').firstMatch(val);
-            if (last4 != null) val = last4.group(1)!;
-          }
-          result[entry.key] = val;
-        }
-      }
-
-      debugPrint('[AI] Gemini extracted fields: $result');
-      if (result.isEmpty) {
-        return AiResult(fields: {}, error: 'Gemini extracted no fields from the receipt', provider: 'gemini');
-      }
-      return AiResult(fields: result, provider: 'gemini');
-    } catch (e) {
-      debugPrint('[AI] Gemini error: $e');
-      return AiResult(fields: {}, error: 'Gemini error: $e', provider: 'gemini');
-    }
-  }
-
-  String _detectMimeType(Uint8List bytes) {
-    if (bytes.length < 4) return 'image/jpeg';
-    if (bytes[0] == 0xFF && bytes[1] == 0xD8) return 'image/jpeg';
-    if (bytes[0] == 0x89 && bytes[1] == 0x50) return 'image/png';
-    if (bytes[0] == 0x47 && bytes[1] == 0x49) return 'image/gif';
-    if (bytes[0] == 0x52 && bytes[1] == 0x49) return 'image/webp';
-    if (bytes[0] == 0x42 && bytes[1] == 0x4D) return 'image/bmp';
-    return 'image/jpeg';
-  }
-
-  Future<AiResult> _processWithSarvam(Uint8List bytes, String filePath) async {
-    debugPrint('[AI] Sarvam: Starting OCR + LLM pipeline...');
-
-    final ocrResult = await _runOcr(bytes, filePath);
-    if (ocrResult.error != null) {
-      debugPrint('[AI] Sarvam OCR failed: ${ocrResult.error}');
-      return AiResult(fields: {}, error: ocrResult.error, provider: 'sarvam');
-    }
-    if (ocrResult.text.isEmpty) {
-      debugPrint('[AI] Sarvam OCR returned empty text');
-      return AiResult(fields: {}, error: 'OCR returned no text. The image may be unreadable.', provider: 'sarvam');
-    }
-
-    debugPrint('[AI] Sarvam OCR text length: ${ocrResult.text.length}');
-    final cleanText = _cleanOcrText(ocrResult.text);
-    debugPrint('[AI] Sarvam cleaned text length: ${cleanText.length}');
-
-    return await _extractWithLLM(cleanText);
-  }
-
-  Future<_OcrResult> _runOcr(Uint8List imageBytes, String filePath) async {
-    final headers = {
-      'api-subscription-key': settings.apiKey,
-      'Content-Type': 'application/json',
-    };
-
-    debugPrint('[AI] Sarvam Step 1: Creating OCR job...');
-    final createResp = await http.post(
-      Uri.parse('$_sarvamBaseUrl/doc-digitization/job/v1'),
-      headers: headers,
-      body: jsonEncode({
-        'job_parameters': {
-          'language': 'en-IN',
-          'output_format': 'md',
-        },
-      }),
-    );
-
-    if (createResp.statusCode != 202) {
-      String errorMsg = 'Create job failed';
-      try {
-        final errBody = jsonDecode(createResp.body);
-        if (errBody is Map && errBody['error'] is Map) {
-          errorMsg = errBody['error']['message'] ?? errorMsg;
-        }
-      } catch (_) {}
-      debugPrint('[AI] Sarvam create job failed: ${createResp.statusCode} $errorMsg');
-      return _OcrResult(error: 'OCR job creation failed (${createResp.statusCode}): $errorMsg');
-    }
-
-    final createData = jsonDecode(createResp.body) as Map<String, dynamic>;
-    final jobId = createData['job_id'] as String;
-    debugPrint('[AI] Sarvam job created: $jobId');
-
-    final ext = filePath.split('.').last.toLowerCase();
-    final supportedExts = ['jpg', 'jpeg', 'png', 'pdf', 'webp', 'gif', 'bmp', 'heic', 'heif'];
-    final fileName = supportedExts.contains(ext) ? 'document.$ext' : 'document.jpg';
-    debugPrint('[AI] Sarvam using filename: $fileName');
-
-    debugPrint('[AI] Sarvam Step 2: Getting upload URLs...');
-    final uploadResp = await http.post(
-      Uri.parse('$_sarvamBaseUrl/doc-digitization/job/v1/upload-files'),
-      headers: headers,
-      body: jsonEncode({
-        'job_id': jobId,
-        'files': [fileName],
-      }),
-    );
-
-    if (uploadResp.statusCode != 200) {
-      String errorMsg = 'Get upload URLs failed';
-      try {
-        final errBody = jsonDecode(uploadResp.body);
-        if (errBody is Map && errBody['error'] is Map) {
-          errorMsg = errBody['error']['message'] ?? errorMsg;
-        }
-      } catch (_) {}
-      debugPrint('[AI] Sarvam get upload URLs failed: ${uploadResp.statusCode} $errorMsg');
-      return _OcrResult(error: 'Upload URL request failed (${uploadResp.statusCode}): $errorMsg');
-    }
-
-    final uploadData = jsonDecode(uploadResp.body) as Map<String, dynamic>;
-    final uploadUrls = uploadData['upload_urls'] as Map<String, dynamic>;
-    final fileUrl = uploadUrls[fileName]?['file_url'] as String?;
-    if (fileUrl == null) {
-      debugPrint('[AI] Sarvam no upload URL for $fileName. Keys: ${uploadUrls.keys}');
-      return _OcrResult(error: 'No upload URL returned for $fileName');
-    }
-
-    debugPrint('[AI] Sarvam Step 3: Uploading file to Azure blob...');
-    final putResp = await http.put(
-      Uri.parse(fileUrl),
-      headers: {'x-ms-blob-type': 'BlockBlob'},
-      body: imageBytes,
-    );
-
-    if (putResp.statusCode != 201) {
-      debugPrint('[AI] Sarvam file upload failed: ${putResp.statusCode}');
-      return _OcrResult(error: 'File upload to storage failed (${putResp.statusCode})');
-    }
-    debugPrint('[AI] Sarvam file uploaded successfully');
-
-    debugPrint('[AI] Sarvam Step 4: Starting OCR job...');
-    final startResp = await http.post(
-      Uri.parse('$_sarvamBaseUrl/doc-digitization/job/v1/$jobId/start'),
-      headers: headers,
-    );
-
-    if (startResp.statusCode != 202) {
-      String errorMsg = 'Start job failed';
-      try {
-        final errBody = jsonDecode(startResp.body);
-        if (errBody is Map && errBody['error'] is Map) {
-          errorMsg = errBody['error']['message'] ?? errorMsg;
-        }
-      } catch (_) {}
-      debugPrint('[AI] Sarvam start job failed: ${startResp.statusCode} $errorMsg');
-      return _OcrResult(error: 'OCR job start failed (${startResp.statusCode}): $errorMsg');
-    }
-    debugPrint('[AI] Sarvam job started successfully');
-
-    debugPrint('[AI] Sarvam Step 5: Polling for job completion...');
-    for (int i = 0; i < 30; i++) {
-      await Future.delayed(Duration(milliseconds: i < 2 ? 500 : 1000));
-
-      final statusResp = await http.get(
-        Uri.parse('$_sarvamBaseUrl/doc-digitization/job/v1/$jobId/status'),
-        headers: headers,
-      );
-
-      if (statusResp.statusCode != 200) {
-        debugPrint('[AI] Sarvam status poll $i returned ${statusResp.statusCode}');
-        continue;
-      }
-
-      final statusData = jsonDecode(statusResp.body) as Map<String, dynamic>;
-      final jobState = statusData['job_state'] as String? ?? '';
-      debugPrint('[AI] Sarvam poll $i: job_state=$jobState');
-
-      if (jobState == 'Completed' || jobState == 'PartiallyCompleted') {
-        debugPrint('[AI] Sarvam Step 6: Downloading OCR results...');
-        final downloadResp = await http.post(
-          Uri.parse('$_sarvamBaseUrl/doc-digitization/job/v1/$jobId/download-files'),
-          headers: headers,
-        );
-
-        if (downloadResp.statusCode != 200) {
-          debugPrint('[AI] Sarvam download failed: ${downloadResp.statusCode} ${downloadResp.body}');
-          return _OcrResult(error: 'Download OCR results failed (${downloadResp.statusCode})');
-        }
-
-        final downloadData = jsonDecode(downloadResp.body) as Map<String, dynamic>;
-        final dlUrls = downloadData['download_urls'] as Map<String, dynamic>;
-        final dlUrl = dlUrls.values.first?['file_url'] as String?;
-        if (dlUrl == null) {
-          debugPrint('[AI] Sarvam no download URL in response');
-          return _OcrResult(error: 'No download URL in response');
-        }
-
-        debugPrint('[AI] Sarvam downloading ZIP from: $dlUrl');
-        final zipResp = await http.get(Uri.parse(dlUrl));
-        if (zipResp.statusCode != 200) {
-          debugPrint('[AI] Sarvam ZIP download failed: ${zipResp.statusCode}');
-          return _OcrResult(error: 'Download OCR ZIP failed (${zipResp.statusCode})');
-        }
-
-        debugPrint('[AI] Sarvam ZIP downloaded: ${zipResp.bodyBytes.length} bytes');
-        return _OcrResult(text: _extractTextFromZip(zipResp.bodyBytes));
-      }
-
-      if (jobState == 'Failed') {
-        String errorMsg = 'OCR job failed';
-        try {
-          if (statusData['error_message'] != null && (statusData['error_message'] as String).isNotEmpty) {
-            errorMsg = statusData['error_message'] as String;
-          }
-        } catch (_) {}
-        debugPrint('[AI] Sarvam OCR job failed: $errorMsg');
-        return _OcrResult(error: 'OCR processing failed: $errorMsg');
-      }
-    }
-
-    debugPrint('[AI] Sarvam OCR job timed out after 30 polls');
-    return _OcrResult(error: 'OCR processing timed out. Please try again.');
-  }
-
-  String _extractTextFromZip(Uint8List zipBytes) {
-    try {
-      final archive = ZipDecoder().decodeBytes(zipBytes);
-      debugPrint('[AI] Sarvam ZIP contains ${archive.length} files');
-      final allText = StringBuffer();
-      for (final file in archive) {
-        debugPrint('[AI] Sarvam ZIP entry: ${file.name} (isFile=${file.isFile}, size=${file.content.length})');
-        if (file.isFile && !file.name.endsWith('.json')) {
-          final content = String.fromCharCodes(file.content);
-          allText.writeln(content);
-        }
-      }
-      final result = allText.toString().trim();
-      debugPrint('[AI] Sarvam extracted text length: ${result.length}');
-      return result;
-    } catch (e) {
-      debugPrint('[AI] Sarvam ZIP parse error: $e');
-      return '';
-    }
-  }
-
-  String _cleanOcrText(String ocrText) {
-    final lines = ocrText.split('\n');
-    final cleaned = <String>[];
-    for (final line in lines) {
-      if (line.contains('[IMAGE]')) continue;
-      if (line.startsWith('*') && line.endsWith('*') && line.length > 20) continue;
-      cleaned.add(line);
-    }
-    return cleaned.join('\n')
-      .replaceAll(RegExp(r'!\[.*?\]\(data:image.*?\)'), '')
-      .replaceAll(RegExp(r'\n{3,}'), '\n\n')
-      .trim();
-  }
-
-  Future<AiResult> _extractWithLLM(String ocrText) async {
-    try {
-      debugPrint('[AI] Sarvam Step 7: Sending OCR text to LLM for field extraction...');
-      debugPrint('[AI] Sarvam OCR text for LLM (first 500 chars): ${ocrText.substring(0, ocrText.length > 500 ? 500 : ocrText.length)}');
-
-      final resp = await http.post(
-        Uri.parse('$_sarvamBaseUrl/v1/chat/completions'),
-        headers: {
-          'api-subscription-key': settings.apiKey,
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
-          'model': 'sarvam-105b',
-          'messages': [
-            {
-              'role': 'user',
-              'content': 'Extract fields from this payment receipt text. Return ONLY raw JSON with keys: customerName, amount, mobileNumber, transactionId, lastFourDigits, aadhaarNumber, bankName. If a field is not present, set it to null. No reasoning, no markdown, no explanation.\n\n$ocrText',
-            },
-          ],
-          'max_tokens': 4000,
-        }),
-      );
-
-      if (resp.statusCode != 200) {
-        String errorMsg = 'LLM request failed';
-        try {
-          final errBody = jsonDecode(resp.body);
-          if (errBody is Map && errBody['error'] is Map) {
-            errorMsg = errBody['error']['message'] ?? errorMsg;
-          }
-        } catch (_) {}
-        debugPrint('[AI] Sarvam LLM extraction failed: ${resp.statusCode} $errorMsg');
-        return AiResult(fields: {}, error: 'AI field extraction failed (${resp.statusCode}): $errorMsg', provider: 'sarvam');
-      }
-
-      debugPrint('[AI] Sarvam LLM response received successfully');
-
-      final data = jsonDecode(resp.body) as Map<String, dynamic>;
       final choices = data['choices'] as List?;
       if (choices == null || choices.isEmpty) {
-        debugPrint('[AI] Sarvam no choices in LLM response');
-        return AiResult(fields: {}, error: 'AI model returned no response choices', provider: 'sarvam');
+        debugPrint('[AI] NVIDIA NIM: No choices in response');
+        return AiResult(fields: {}, error: 'AI returned no response');
       }
 
-      final message = choices[0]['message'] as Map<String, dynamic>?;
-      final content = message?['content'] as String?;
+      final content = choices[0]['message']?['content'] as String?;
       if (content == null || content.isEmpty) {
-        debugPrint('[AI] Sarvam empty content in LLM response');
-        return AiResult(fields: {}, error: 'AI model returned empty response', provider: 'sarvam');
+        debugPrint('[AI] NVIDIA NIM: Empty response content');
+        return AiResult(fields: {}, error: 'AI returned empty response');
       }
 
-      debugPrint('[AI] Sarvam LLM raw response: $content');
+      debugPrint('[AI] NVIDIA NIM raw response: $content');
 
       final jsonMatch = RegExp(r'\{.*\}', dotAll: true).firstMatch(content);
       if (jsonMatch == null) {
-        debugPrint('[AI] Sarvam no JSON found in LLM response');
-        return AiResult(fields: {}, error: 'AI response did not contain valid JSON. Raw response: ${content.length > 200 ? content.substring(0, 200) : content}', provider: 'sarvam');
+        debugPrint('[AI] NVIDIA NIM: No JSON found in response');
+        return AiResult(fields: {}, error: 'AI response did not contain valid JSON');
       }
 
       final jsonStr = jsonMatch.group(0)!;
-      debugPrint('[AI] Sarvam extracted JSON: $jsonStr');
+      debugPrint('[AI] NVIDIA NIM extracted JSON: $jsonStr');
 
       final fields = jsonDecode(jsonStr) as Map<String, dynamic>;
       final result = <String, dynamic>{};
@@ -597,14 +237,14 @@ class AiService {
         }
       }
 
-      debugPrint('[AI] Sarvam extracted fields: $result');
+      debugPrint('[AI] NVIDIA NIM extracted fields: $result');
       if (result.isEmpty) {
-        return AiResult(fields: {}, error: 'AI extracted no fields from the receipt. The receipt format may not be recognized.', provider: 'sarvam');
+        return AiResult(fields: {}, error: 'AI extracted no fields from the receipt');
       }
-      return AiResult(fields: result, provider: 'sarvam');
+      return AiResult(fields: result, provider: 'nim');
     } catch (e) {
-      debugPrint('[AI] Sarvam LLM extraction error: $e');
-      return AiResult(fields: {}, error: 'AI field extraction error: $e', provider: 'sarvam');
+      debugPrint('[AI] NVIDIA NIM error: $e');
+      return AiResult(fields: {}, error: 'AI error: $e');
     }
   }
 
@@ -616,11 +256,4 @@ class AiService {
     }
     return null;
   }
-}
-
-class _OcrResult {
-  final String text;
-  final String? error;
-
-  _OcrResult({this.text = '', this.error});
 }

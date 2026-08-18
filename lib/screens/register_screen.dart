@@ -183,7 +183,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     controller: _aiApiKeyController,
                     obscureText: true,
                     decoration: const InputDecoration(
-                      labelText: 'Sarvam AI API Key',
+                      labelText: 'NVIDIA NIM API Key',
+                      hintText: 'nvapi-...',
                       prefixIcon: Icon(Icons.key),
                     ),
                   ),

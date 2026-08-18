@@ -2,7 +2,7 @@
 
 ## Overview
 
-Runova-Diary is a Flutter mobile app (Android-first) that replaces the traditional paper diary for shop owners offering AEPS (Aadhaar-enabled Payment System) and PhonePe cash-in/cash-out services in India. It records transactions, auto-calculates commissions, maintains daily balances across multiple accounts, works offline-first, syncs to Firebase, and uses Sarvam AI to auto-fill forms from receipt images.
+Runova-Diary is a Flutter mobile app (Android-first) that replaces the traditional paper diary for shop owners offering AEPS (Aadhaar-enabled Payment System) and PhonePe cash-in/cash-out services in India. It records transactions, auto-calculates commissions, maintains daily balances across multiple accounts, works offline-first, syncs to Firebase, and uses NVIDIA NIM vision model to auto-fill forms from receipt images.
 
 **Version:** 1.0.0+1 | **SDK:** Dart ^3.6.2 | **State Management:** Riverpod | **Local DB:** Hive | **Cloud:** Firebase Firestore
 
@@ -19,7 +19,7 @@ User Input → Screen → Provider (StateNotifier) → HiveService (local) → S
 
 ### AI Flow
 ```
-Image → Sarvam OCR (doc-digitization) → Raw Text → Sarvam LLM (sarvam-105b) → JSON Fields → Form Population
+Image → Compress (640px, JPEG 50) → NVIDIA NIM Vision (nemotron-nano-vl-8b) → JSON Fields → Form Population
 ```
 
 ---
@@ -247,10 +247,11 @@ Registration (phone + SHA-256 PIN), login, PIN verification, PIN change. Stores 
 - `smartDetect(total, ...)` — deduces base amount + commission from total
 
 ### AiService
-Two-step Sarvam AI pipeline:
-1. **OCR**: `_runOcr()` — doc-digitization job (create → upload → start → poll → download → parse ZIP)
-2. **LLM Extraction**: `_extractWithLLM()` — sends OCR text to `sarvam-105b` chat completions, returns JSON with `customerName`, `amount`, `mobileNumber`, `transactionId`, `lastFourDigits`, `aadhaarNumber`
-3. **Account Matching**: `matchAccountId()` — matches `lastFourDigits` to known bank accounts
+Single NVIDIA NIM vision model call:
+1. **Compress**: Resize to 640px, JPEG quality 50
+2. **Vision**: Send base64 image to `nvidia/llama-3.1-nemotron-nano-vl-8b-v1` via NVIDIA NIM API
+3. **Parse**: Extract JSON with `customerName`, `amount`, `mobileNumber`, `transactionId`, `lastFourDigits`, `aadhaarNumber`, `bankName`
+4. **Account Matching**: `matchAccountId()` — matches `lastFourDigits` to known bank accounts
 
 ### SyncService
 Offline-first sync: pushes local Hive data to Firebase when online, pulls Firebase data on login/register. Uses `connectivity_plus` to detect online status.
@@ -282,27 +283,17 @@ Each transaction type affects specific account balances:
 
 ## AI Integration
 
-**Provider:** Sarvam AI | **Base URL:** `https://api.sarvam.ai` | **Auth:** `api-subscription-key` header
+**Provider:** NVIDIA NIM | **Base URL:** `https://integrate.api.nvidia.com/v1` | **Auth:** Bearer token
 
-### OCR Flow (doc-digitization)
-1. `POST /doc-digitization/job/v1` → get job_id
-2. `POST /doc-digitization/job/v1/upload-files` → get Azure blob URL
-3. `PUT {azure_url}` → upload image as `document.jpg`
-4. `POST /doc-digitization/job/v1/{jobId}/start`
-5. `GET /doc-digitization/job/v1/{jobId}/status` — poll every 2-5s, up to 30 tries
-6. `POST /doc-digitization/job/v1/{jobId}/download-files` → get download URL
-7. Download ZIP, parse markdown text from it
-
-### LLM Extraction
-- **Model:** `sarvam-105b` (via `/v1/chat/completions`)
-- **Prompt:** Extract `customerName`, `amount`, `mobileNumber`, `transactionId`, `lastFourDigits`, `aadhaarNumber` as JSON
+### Vision Model
+- **Model:** `nvidia/llama-3.1-nemotron-nano-vl-8b-v1`
+- **Endpoint:** `POST /v1/chat/completions` (OpenAI-compatible)
+- **Image:** Base64-encoded JPEG, max 640px, quality 50
+- **Prompt:** Extract `customerName`, `amount`, `mobileNumber`, `transactionId`, `lastFourDigits`, `aadhaarNumber`, `bankName` as JSON
 - **Post-processing:** Strip ₹/commas from amount, extract last 4 digits from masked strings
 
 ### Account Matching
 `matchAccountId(fields, accounts)` — matches extracted `lastFourDigits` against `BankAccount.lastFourDigits`
-
-### API Key (test)
-`sk_f9xingij_yhFq7DU468sOK0f5y61TSTUJ`
 
 ---
 
@@ -320,12 +311,7 @@ Each transaction type affects specific account balances:
 
 1. **`bank_accounts_screen.dart:147`** — References `acctCtrl` (account number controller) which is never declared. Would crash if add/edit account dialog is opened.
 2. **Firebase Security Rules** use `request.auth.uid` but app does NOT use Firebase Auth (uses custom PIN auth). Cloud sync would fail silently.
-3. **AI mobileNumber extraction** sometimes returns UPI IDs (e.g., `Q731799696@ybl`) instead of phone numbers — this is a Sarvam LLM limitation.
-
----
-
-## API Key (Test)
-`sk_f9xingij_yhFq7DU468sOK0f5y61TSTUJ`
+3. **AI mobileNumber extraction** sometimes returns UPI IDs (e.g., `Q731799696@ybl`) instead of phone numbers — vision model limitation.
 
 ---
 
@@ -361,7 +347,7 @@ Each transaction type affects specific account balances:
 
 1. **`bank_accounts_screen.dart:147`** — References `acctCtrl` (account number controller) which is never declared. Would crash if add/edit account dialog is opened.
 2. **Firebase Security Rules** use `request.auth.uid` but app does NOT use Firebase Auth (uses custom PIN auth). Cloud sync would fail silently.
-3. **AI mobileNumber extraction** sometimes returns UPI IDs (e.g., `Q731799696@ybl`) instead of phone numbers — Sarvam LLM limitation.
+3. **AI mobileNumber extraction** sometimes returns UPI IDs (e.g., `Q731799696@ybl`) instead of phone numbers — vision model limitation.
 
 ---
 

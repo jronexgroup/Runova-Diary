@@ -512,7 +512,7 @@ class AiSettingsNotifier extends StateNotifier<AiSettings> {
     if (json != null) {
       try {
         final parsed = AiSettings.fromJson(jsonDecode(json) as Map<String, dynamic>);
-        state = parsed.copyWith(enabled: parsed.apiKey.isNotEmpty || parsed.hasGeminiKeys);
+        state = parsed.copyWith(enabled: parsed.apiKey.isNotEmpty);
         return;
       } catch (_) {}
     }
@@ -525,26 +525,7 @@ class AiSettingsNotifier extends StateNotifier<AiSettings> {
   }
 
   Future<void> setApiKey(String key, String userId) async {
-    state = state.copyWith(apiKey: key, enabled: key.isNotEmpty || state.hasGeminiKeys);
-    await save(userId);
-  }
-
-  Future<void> addGeminiKey(String key, String userId) async {
-    final keys = [...state.geminiApiKeys, key];
-    state = state.copyWith(geminiApiKeys: keys, enabled: key.isNotEmpty || state.apiKey.isNotEmpty);
-    await save(userId);
-  }
-
-  Future<void> removeGeminiKey(int index, String userId) async {
-    final keys = [...state.geminiApiKeys]..removeAt(index);
-    state = state.copyWith(geminiApiKeys: keys, enabled: state.apiKey.isNotEmpty || keys.isNotEmpty);
-    await save(userId);
-  }
-
-  Future<void> updateGeminiKey(int index, String key, String userId) async {
-    final keys = [...state.geminiApiKeys];
-    keys[index] = key;
-    state = state.copyWith(geminiApiKeys: keys, enabled: state.apiKey.isNotEmpty || keys.isNotEmpty);
+    state = state.copyWith(apiKey: key, enabled: key.isNotEmpty);
     await save(userId);
   }
 
@@ -554,7 +535,7 @@ class AiSettingsNotifier extends StateNotifier<AiSettings> {
   }
 
   Future<void> update(AiSettings updated, String userId) async {
-    state = updated.copyWith(enabled: updated.apiKey.isNotEmpty || updated.hasGeminiKeys);
+    state = updated.copyWith(enabled: updated.apiKey.isNotEmpty);
     await save(userId);
   }
 }

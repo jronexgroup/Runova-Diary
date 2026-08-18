@@ -62,7 +62,7 @@ Each PhonePe account has its own commission settings:
 - Accounts: Hasibul, Runa Laila (default), plus up to 3 custom accounts
 
 ### 6. AI-Powered Form Filling
-- Uses Sarvam AI API to extract transaction details from images
+- Uses NVIDIA NIM vision model to extract transaction details from images
 - Auto-fills customer name, amount, mobile number, transaction ID, and Aadhaar number
 - AI auto-enables when an API key is saved
 - Tap the AI button (sparkle icon) on any New Transaction screen to use
@@ -163,7 +163,7 @@ Each PhonePe account has its own commission settings:
 
 ### AI not working
 - Go to Settings → AI Settings
-- Enter a valid Sarvam AI API key
+- Enter a valid NVIDIA NIM API key
 - AI auto-enables when a key is saved
 - Make sure you have an internet connection
 - Try uploading a clearer image
