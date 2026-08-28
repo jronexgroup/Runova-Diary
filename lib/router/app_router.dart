@@ -15,6 +15,7 @@ import '../screens/transaction_detail_screen.dart';
 import '../screens/bank_accounts_screen.dart';
 import '../screens/commission_settings_screen.dart';
 import '../screens/ai_settings_screen.dart';
+import '../screens/ai_logs_screen.dart';
 import '../screens/aeps_commission_screen.dart';
 import '../screens/distributor_commission_screen.dart';
 import '../screens/settlement_charge_screen.dart';
@@ -145,6 +146,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/ai-settings',
         builder: (_, __) => const AiSettingsScreen(),
+      ),
+      GoRoute(
+        path: '/ai-logs',
+        builder: (_, __) => const AiLogsScreen(),
       ),
       GoRoute(
         path: '/change-pin',

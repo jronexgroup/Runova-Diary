@@ -226,6 +226,13 @@ class _NewTransactionScreenState extends ConsumerState<NewTransactionScreen> {
         ),
         actions: [
           TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              context.push('/ai-logs');
+            },
+            child: const Text('View Logs'),
+          ),
+          TextButton(
             onPressed: () => Navigator.of(context).pop(),
             child: const Text('OK'),
           ),

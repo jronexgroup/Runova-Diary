@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:image/image.dart' as img;
 import '../models/ai_settings.dart';
 import '../models/bank_account.dart';
+import 'ai_log_service.dart';
 
 enum AiProgressStep {
   readingImage,
@@ -62,6 +63,7 @@ class AiService {
   static const _jpegQuality = 50;
   static final http.Client _httpClient = http.Client();
   final AiMonitorCallback? onMonitor;
+  final _log = AiLogService();
 
   static const _prompt =
       'Extract payment details from this receipt image. Return ONLY raw JSON:\n'
@@ -80,40 +82,40 @@ class AiService {
 
   Future<AiResult> processDocument(String filePath, {AiProgressCallback? onProgress}) async {
     if (!settings.enabled) {
-      debugPrint('[AI] AI disabled');
+      _log.warn('AI disabled');
       return AiResult(fields: {}, error: 'AI is not configured. Enable in Settings > AI Settings.');
     }
 
-    debugPrint('[AI] processDocument called with filePath: $filePath');
+    _log.info('processDocument: $filePath');
 
     try {
       onProgress?.call(AiProgressStep.readingImage, 'Reading image...');
       final file = File(filePath);
       if (!file.existsSync()) {
-        debugPrint('[AI] File does not exist: $filePath');
+        _log.error('File not found: $filePath');
         return AiResult(fields: {}, error: 'File not found: $filePath');
       }
 
       final bytes = await file.readAsBytes();
-      debugPrint('[AI] Read ${bytes.length} bytes from file');
+      _log.info('Read ${bytes.length} bytes');
 
       onProgress?.call(AiProgressStep.compressing, 'Compressing image...');
       final compressed = _compressImage(bytes);
-      debugPrint('[AI] Compressed to ${compressed.length} bytes');
+      _log.info('Compressed: ${bytes.length} -> ${compressed.length} bytes');
 
       onProgress?.call(AiProgressStep.sendingToAi, 'Sending to NVIDIA NIM...');
       _emitMonitor();
 
       final result = await _callNvidiaNim(compressed, onProgress: onProgress);
       if (result.isSuccess) {
-        debugPrint('[AI] NVIDIA NIM succeeded');
+        _log.info('Success: ${result.fields.length} fields extracted');
         return result;
       }
 
-      debugPrint('[AI] NVIDIA NIM failed: ${result.error}');
+      _log.error('Failed: ${result.error}');
       return result;
     } catch (e) {
-      debugPrint('[AI] processDocument exception: $e');
+      _log.error('Exception: $e');
       return AiResult(fields: {}, error: 'AI processing error: $e');
     }
   }
@@ -136,10 +138,9 @@ class AiService {
       }
 
       final compressed = img.encodeJpg(resized, quality: _jpegQuality);
-      debugPrint('[AI] Compressed image: ${bytes.length} -> ${compressed.length} bytes');
       return Uint8List.fromList(compressed);
     } catch (e) {
-      debugPrint('[AI] Image compression failed, using original: $e');
+      _log.error('Image compression failed: $e');
       return bytes;
     }
   }
@@ -166,8 +167,8 @@ class AiService {
         'temperature': 0.1,
       });
 
+      _log.info('POST $_baseUrl/chat/completions (model=$_model)');
       final stopwatch = Stopwatch()..start();
-      debugPrint('[AI] NVIDIA NIM: Sending POST request...');
       final resp = await _httpClient
           .post(
             Uri.parse('$_baseUrl/chat/completions'),
@@ -178,10 +179,10 @@ class AiService {
             body: body,
           )
           .timeout(const Duration(seconds: 30));
-      debugPrint('[AI] NVIDIA NIM: Response received in ${stopwatch.elapsedMilliseconds}ms, status=${resp.statusCode}');
+      _log.info('Response: ${resp.statusCode} in ${stopwatch.elapsedMilliseconds}ms');
 
       if (resp.statusCode == 429) {
-        debugPrint('[AI] NVIDIA NIM: Rate limited (429).');
+        _log.warn('Rate limited (429)');
         return AiResult(fields: {}, error: 'Rate limited. Please try again shortly.');
       }
 
@@ -197,7 +198,8 @@ class AiService {
             }
           }
         } catch (_) {}
-        debugPrint('[AI] NVIDIA NIM failed: ${resp.statusCode} $errorMsg');
+        _log.error('HTTP ${resp.statusCode}: $errorMsg');
+        _log.error('Response body: ${resp.body}');
         return AiResult(fields: {}, error: 'AI error ($resp.statusCode): $errorMsg');
       }
 
@@ -205,26 +207,26 @@ class AiService {
       final data = jsonDecode(resp.body) as Map<String, dynamic>;
       final choices = data['choices'] as List?;
       if (choices == null || choices.isEmpty) {
-        debugPrint('[AI] NVIDIA NIM: No choices in response');
+        _log.error('No choices in response');
         return AiResult(fields: {}, error: 'AI returned no response');
       }
 
       final content = choices[0]['message']?['content'] as String?;
       if (content == null || content.isEmpty) {
-        debugPrint('[AI] NVIDIA NIM: Empty response content');
+        _log.error('Empty response content');
         return AiResult(fields: {}, error: 'AI returned empty response');
       }
 
-      debugPrint('[AI] NVIDIA NIM raw response: $content');
+      _log.info('Raw response: $content');
 
       final jsonMatch = RegExp(r'\{.*\}', dotAll: true).firstMatch(content);
       if (jsonMatch == null) {
-        debugPrint('[AI] NVIDIA NIM: No JSON found in response');
+        _log.error('No JSON found in response');
         return AiResult(fields: {}, error: 'AI response did not contain valid JSON');
       }
 
       final jsonStr = jsonMatch.group(0)!;
-      debugPrint('[AI] NVIDIA NIM extracted JSON: $jsonStr');
+      _log.info('Extracted JSON: $jsonStr');
 
       final fields = jsonDecode(jsonStr) as Map<String, dynamic>;
       final result = <String, dynamic>{};
@@ -241,13 +243,13 @@ class AiService {
         }
       }
 
-      debugPrint('[AI] NVIDIA NIM extracted fields: $result');
+      _log.info('Final fields: $result');
       if (result.isEmpty) {
         return AiResult(fields: {}, error: 'AI extracted no fields from the receipt');
       }
       return AiResult(fields: result, provider: 'nim');
     } catch (e) {
-      debugPrint('[AI] NVIDIA NIM error: $e');
+      _log.error('Exception: $e');
       return AiResult(fields: {}, error: 'AI error: $e');
     }
   }
