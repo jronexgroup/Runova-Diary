@@ -189,8 +189,12 @@ class AiService {
         String errorMsg = 'NVIDIA NIM request failed';
         try {
           final errBody = jsonDecode(resp.body);
-          if (errBody is Map && errBody['error'] is Map) {
-            errorMsg = errBody['error']['message'] ?? errorMsg;
+          if (errBody is Map) {
+            if (errBody['error'] is Map) {
+              errorMsg = errBody['error']['message'] ?? errorMsg;
+            } else if (errBody['detail'] != null) {
+              errorMsg = errBody['detail'].toString();
+            }
           }
         } catch (_) {}
         debugPrint('[AI] NVIDIA NIM failed: ${resp.statusCode} $errorMsg');
