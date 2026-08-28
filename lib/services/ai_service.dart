@@ -57,7 +57,7 @@ class AiResult {
 class AiService {
   final AiSettings settings;
   static const _baseUrl = 'https://integrate.api.nvidia.com/v1';
-  static const _model = 'nvidia/llama-3.1-nemotron-nano-vl-8b-v1';
+  static const _model = 'meta/llama-3.2-11b-vision-instruct';
   static const _maxDimension = 640;
   static const _jpegQuality = 50;
   static final http.Client _httpClient = http.Client();
