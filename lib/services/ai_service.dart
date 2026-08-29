@@ -58,7 +58,7 @@ class AiResult {
 class AiService {
   final AiSettings settings;
   static const _baseUrl = 'https://integrate.api.nvidia.com/v1';
-  static const _model = 'meta/llama-3.2-11b-vision-instruct';
+  static const _model = 'google/diffusiongemma-26b-a4b-it';
   static const _maxDimension = 640;
   static const _jpegQuality = 50;
   static final http.Client _httpClient = http.Client();
