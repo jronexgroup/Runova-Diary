@@ -58,7 +58,8 @@ class AiResult {
 class AiService {
   final AiSettings settings;
   static const _baseUrl = 'https://integrate.api.nvidia.com/v1';
-  static const _model = 'google/diffusiongemma-26b-a4b-it';
+  static const _model = 'meta/llama-3.2-11b-vision-instruct';
+  static const _maxRetries = 2;
   static const _maxDimension = 640;
   static const _jpegQuality = 50;
   static final http.Client _httpClient = http.Client();
@@ -66,17 +67,22 @@ class AiService {
   final _log = AiLogService();
 
   static const _prompt =
-      'Extract payment details from this receipt image. Return ONLY raw JSON:\n'
-      '{\n'
-      '  "customerName": "name of the person who paid or received",\n'
-      '  "amount": "payment amount as number (no currency symbol)",\n'
-      '  "mobileNumber": "10-digit phone number. Check UPI IDs like name@okaxis, name@ybl — extract the phone digits if visible",\n'
-      '  "transactionId": "unique transaction/reference ID",\n'
-      '  "lastFourDigits": "last 4 digits of the bank account or card number shown",\n'
-      '  "aadhaarNumber": "12-digit Aadhaar number if visible",\n'
-      '  "bankName": "bank name like State Bank of India, Punjab National Bank, etc."\n'
-      '}\n'
-      'If a field is not visible, set it to null. No explanation, no markdown.';
+      'You are a receipt parser. Look at this payment receipt image carefully.\n'
+      'Extract ALL visible fields. Be precise — do NOT guess or mix up fields.\n\n'
+      'Rules:\n'
+      '- customerName: The name of the person who paid or received money. '
+      'Look for "Name:", "Paid to:", "Received from:", or any person name on the receipt.\n'
+      '- amount: The payment amount as a plain number. Remove ₹, commas, spaces.\n'
+      '- mobileNumber: Exactly 10 digits. If you see a UPI ID like "name@ybl" or "name@okaxis", '
+      'extract the digits from it. This is NOT a transaction ID.\n'
+      '- transactionId: The UTR number, reference number, or transaction ID. '
+      'It is usually a long alphanumeric code like "T2504131018526977625641" or "618009526556".\n'
+      '- lastFourDigits: Last 4 digits of the bank account or card. '
+      'Do NOT use transaction ID digits. Look for "XXXX1234" or "••••1234" patterns.\n'
+      '- aadhaarNumber: 12-digit Aadhaar number. If you see "XXXX XXXX 1234", return "1234" as lastFourDigits.\n'
+      '- bankName: Bank name like "State Bank of India", "Punjab National Bank", "YES BANK", etc.\n\n'
+      'Return ONLY raw JSON. No explanation, no markdown.\n'
+      '{"customerName":null,"amount":null,"mobileNumber":null,"transactionId":null,"lastFourDigits":null,"aadhaarNumber":null,"bankName":null}';
 
   AiService(this.settings, {this.onMonitor});
 
@@ -106,14 +112,26 @@ class AiService {
       onProgress?.call(AiProgressStep.sendingToAi, 'Sending to NVIDIA NIM...');
       _emitMonitor();
 
-      final result = await _callNvidiaNim(compressed, onProgress: onProgress);
-      if (result.isSuccess) {
-        _log.info('Success: ${result.fields.length} fields extracted');
-        return result;
+      // Retry logic
+      AiResult? lastResult;
+      for (int attempt = 1; attempt <= _maxRetries; attempt++) {
+        if (attempt > 1) {
+          _log.info('Retry attempt $_maxRetries/$_maxRetries...');
+          onProgress?.call(AiProgressStep.sendingToAi, 'Retrying... ($attempt/$_maxRetries)');
+          await Future.delayed(const Duration(seconds: 2));
+        }
+
+        lastResult = await _callNvidiaNim(compressed, onProgress: onProgress);
+        if (lastResult.isSuccess) {
+          _log.info('Success on attempt $attempt: ${lastResult.fields.length} fields');
+          return lastResult;
+        }
+
+        _log.warn('Attempt $attempt failed: ${lastResult.error}');
       }
 
-      _log.error('Failed: ${result.error}');
-      return result;
+      _log.error('All $_maxRetries attempts failed');
+      return lastResult!;
     } catch (e) {
       _log.error('Exception: $e');
       return AiResult(fields: {}, error: 'AI processing error: $e');
