@@ -282,9 +282,13 @@ class AiService {
           } else if (entry.key == 'mobileNumber') {
             // Strip +91, 91, 0 prefix, spaces, dashes, parentheses
             var digits = val.replaceAll(RegExp(r'[\s\-\(\)]'), '');
-            if (digits.startsWith('+91')) digits = digits.substring(3);
-            else if (digits.startsWith('91') && digits.length > 10) digits = digits.substring(2);
-            else if (digits.startsWith('0')) digits = digits.substring(1);
+            if (digits.startsWith('+91')) {
+              digits = digits.substring(3);
+            } else if (digits.startsWith('91') && digits.length > 10) {
+              digits = digits.substring(2);
+            } else if (digits.startsWith('0')) {
+              digits = digits.substring(1);
+            }
             // Validate: must be exactly 10 digits after cleanup
             if (digits.length != 10 || !RegExp(r'^\d{10}$').hasMatch(digits)) {
               _log.warn('Invalid mobileNumber "$val" (${digits.length} digits) — discarding');
