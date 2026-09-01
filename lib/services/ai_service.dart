@@ -67,22 +67,17 @@ class AiService {
   final _log = AiLogService();
 
   static const _prompt =
-      'You are a receipt parser. Look at this payment receipt image carefully.\n'
-      'Extract ALL visible fields. Be precise — do NOT guess or mix up fields.\n\n'
-      'Rules:\n'
-      '- customerName: The name of the person who paid or received money. '
-      'Look for "Name:", "Paid to:", "Received from:", or any person name on the receipt.\n'
-      '- amount: The payment amount as a plain number. Remove ₹, commas, spaces.\n'
-      '- mobileNumber: Exactly 10 digits. If you see a UPI ID like "name@ybl" or "name@okaxis", '
-      'extract the digits from it. This is NOT a transaction ID.\n'
-      '- transactionId: The UTR number, reference number, or transaction ID. '
-      'It is usually a long alphanumeric code like "T2504131018526977625641" or "618009526556".\n'
-      '- lastFourDigits: Last 4 digits of the bank account or card. '
-      'Do NOT use transaction ID digits. Look for "XXXX1234" or "••••1234" patterns.\n'
-      '- aadhaarNumber: 12-digit Aadhaar number. If you see "XXXX XXXX 1234", return "1234" as lastFourDigits.\n'
-      '- bankName: Bank name like "State Bank of India", "Punjab National Bank", "YES BANK", etc.\n\n'
-      'Return ONLY raw JSON. No explanation, no markdown.\n'
-      '{"customerName":null,"amount":null,"mobileNumber":null,"transactionId":null,"lastFourDigits":null,"aadhaarNumber":null,"bankName":null}';
+      'IMPORTANT: Reply with ONLY a raw JSON object. No text, no explanation, no markdown, no code blocks.\n\n'
+      'Look at this payment receipt image and extract these fields:\n'
+      '- customerName: person name visible on receipt (the one who paid or received)\n'
+      '- amount: the payment amount as a plain number. Example: if you see ₹1,000, write 1000. Do NOT extract UPI IDs or Aadhaar numbers as amount.\n'
+      '- mobileNumber: exactly 10 digits phone number. If you see UPI ID like "name@ybl", extract the digits part. Do NOT use Aadhaar (12 digits) or transaction ID here.\n'
+      '- transactionId: the UTR number or transaction reference ID. Usually starts with T followed by digits.\n'
+      '- lastFourDigits: last 4 digits of bank account. Look for "XXXX1234" or "••••1234". Do NOT use transaction ID digits.\n'
+      '- aadhaarNumber: 12-digit Aadhaar number if visible\n'
+      '- bankName: bank name like SBI, YES BANK, PNB etc.\n\n'
+      'Set null for fields not visible.\n'
+      'Example: {"customerName":"John","amount":500,"mobileNumber":null,"transactionId":"T123","lastFourDigits":"1234","aadhaarNumber":null,"bankName":"SBI"}';
 
   AiService(this.settings, {this.onMonitor});
 
@@ -237,13 +232,35 @@ class AiService {
 
       _log.info('Raw response: $content');
 
-      final jsonMatch = RegExp(r'\{.*\}', dotAll: true).firstMatch(content);
-      if (jsonMatch == null) {
-        _log.error('No JSON found in response');
+      // Try multiple JSON extraction strategies
+      String? jsonStr;
+
+      // Strategy 1: Look for ```json...``` code block
+      final codeBlockMatch = RegExp(r'```(?:json)?\s*(\{.*?\})\s*```', dotAll: true).firstMatch(content);
+      if (codeBlockMatch != null) {
+        jsonStr = codeBlockMatch.group(1);
+      }
+
+      // Strategy 2: Look for raw JSON object
+      if (jsonStr == null) {
+        final jsonMatch = RegExp(r'\{[^{}]*\}', dotAll: true).firstMatch(content);
+        if (jsonMatch != null) {
+          jsonStr = jsonMatch.group(0);
+        }
+      }
+
+      // Strategy 3: Try to extract fields from text description
+      if (jsonStr == null) {
+        _log.info('No JSON found, trying text extraction...');
+        final extracted = _extractFromText(content);
+        if (extracted.isNotEmpty) {
+          _log.info('Text extraction result: $extracted');
+          return AiResult(fields: extracted, provider: 'nim');
+        }
+        _log.error('No JSON found and text extraction failed');
         return AiResult(fields: {}, error: 'AI response did not contain valid JSON');
       }
 
-      final jsonStr = jsonMatch.group(0)!;
       _log.info('Extracted JSON: $jsonStr');
 
       final fields = jsonDecode(jsonStr) as Map<String, dynamic>;
@@ -253,9 +270,23 @@ class AiService {
           var val = entry.value.toString();
           if (entry.key == 'amount') {
             val = val.replaceAll(RegExp(r'[₹,\s]'), '');
+            // Validate: amount should be a reasonable number (not 20+ digits)
+            final numVal = int.tryParse(val);
+            if (numVal == null || val.length > 12 || numVal <= 0) {
+              _log.warn('Invalid amount "$val" — discarding');
+              continue;
+            }
           } else if (entry.key == 'lastFourDigits') {
             final last4 = RegExp(r'(\d{4})$').firstMatch(val);
             if (last4 != null) val = last4.group(1)!;
+          } else if (entry.key == 'mobileNumber') {
+            // Validate: must be exactly 10 digits
+            final digits = val.replaceAll(RegExp(r'[^0-9]'), '');
+            if (digits.length != 10) {
+              _log.warn('Invalid mobileNumber "$val" (${digits.length} digits) — discarding');
+              continue;
+            }
+            val = digits;
           }
           result[entry.key] = val;
         }
@@ -270,6 +301,55 @@ class AiService {
       _log.error('Exception: $e');
       return AiResult(fields: {}, error: 'AI error: $e');
     }
+  }
+
+  Map<String, dynamic> _extractFromText(String text) {
+    final result = <String, dynamic>{};
+
+    // Extract customerName: look for "Name:", "Paid to:", "Received from:", or "Customer Name:"
+    final namePatterns = [
+      RegExp(r'(?:customer\s*name|paid\s*to|received\s*from|name)[:\s]+([A-Z][A-Z\s]+)', caseSensitive: false),
+      RegExp(r'(?:Customer Name|Paid to|Received from)[:\s]+(.+?)(?:\n|$)', caseSensitive: false),
+    ];
+    for (final p in namePatterns) {
+      final m = p.firstMatch(text);
+      if (m != null) {
+        result['customerName'] = m.group(1)!.trim();
+        break;
+      }
+    }
+
+    // Extract amount: ₹3,000 or "Amount: 3000"
+    final amountMatch = RegExp(r'(?:₹|INR|Rs\.?|amount[:\s]+)\s*([\d,]+)', caseSensitive: false).firstMatch(text);
+    if (amountMatch != null) {
+      result['amount'] = amountMatch.group(1)!.replaceAll(',', '');
+    }
+
+    // Extract transactionId: T26083021000876109384 or UTR patterns
+    final txnMatch = RegExp(r'(?:transaction\s*i[dD]|UTR|ref(?:erence)?)[:\s]*([A-Za-z0-9]+)', caseSensitive: false).firstMatch(text);
+    if (txnMatch != null) {
+      result['transactionId'] = txnMatch.group(1)!.trim();
+    }
+
+    // Extract mobileNumber: 10-digit phone
+    final phoneMatch = RegExp(r'\b(\d{10})\b').firstMatch(text);
+    if (phoneMatch != null) {
+      result['mobileNumber'] = phoneMatch.group(1)!;
+    }
+
+    // Extract lastFourDigits: XXXXXXX2458 or last 4 digits pattern
+    final last4Match = RegExp(r'(?:XXXX|••••|\*)(\d{4})').firstMatch(text);
+    if (last4Match != null) {
+      result['lastFourDigits'] = last4Match.group(1)!;
+    }
+
+    // Extract bankName
+    final bankMatch = RegExp(r'(?:bank|from)[:\s]+(.*?)(?:\n|$)', caseSensitive: false).firstMatch(text);
+    if (bankMatch != null) {
+      result['bankName'] = bankMatch.group(1)!.trim();
+    }
+
+    return result;
   }
 
   String? matchAccountId(Map<String, dynamic> fields, List<BankAccount> accounts) {
