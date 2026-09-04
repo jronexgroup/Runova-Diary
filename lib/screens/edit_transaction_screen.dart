@@ -211,6 +211,14 @@ class _EditTransactionScreenState extends ConsumerState<EditTransactionScreen> {
     if (_original == null) return;
     if (_loading) return;
 
+    final isPhonePeType = _original!.type == TransactionType.cashIn || _original!.type == TransactionType.cashOut;
+    if (isPhonePeType && _selectedAccountId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select a bank account')),
+      );
+      return;
+    }
+
     final user = ref.read(authProvider);
     if (user == null) return;
 

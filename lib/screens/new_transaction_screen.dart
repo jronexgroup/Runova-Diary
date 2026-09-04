@@ -245,6 +245,14 @@ class _NewTransactionScreenState extends ConsumerState<NewTransactionScreen> {
     if (!_formKey.currentState!.validate()) return;
     if (_loading) return;
 
+    final isPhonePeType = widget.type == TransactionType.cashIn || widget.type == TransactionType.cashOut;
+    if (isPhonePeType && _selectedAccountId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select a bank account')),
+      );
+      return;
+    }
+
     final user = ref.read(authProvider);
     if (user == null) return;
 
