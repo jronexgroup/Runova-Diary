@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../models/ai_settings.dart';
 import '../providers/providers.dart';
 
 class AiSettingsScreen extends ConsumerStatefulWidget {
@@ -47,7 +48,8 @@ class _AiSettingsScreenState extends ConsumerState<AiSettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final aiEnabled = ref.watch(aiSettingsProvider).enabled;
+    final aiSettings = ref.watch(aiSettingsProvider);
+    final aiEnabled = aiSettings.enabled;
     final userId = ref.watch(authProvider)?.id ?? '';
     final theme = Theme.of(context);
 
@@ -66,6 +68,45 @@ class _AiSettingsScreenState extends ConsumerState<AiSettingsScreen> {
                 onChanged: (v) {
                   ref.read(aiSettingsProvider.notifier).setEnabled(v, userId);
                 },
+              ),
+            ),
+            const SizedBox(height: 16),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.smart_toy, color: theme.colorScheme.primary),
+                        const SizedBox(width: 8),
+                        Text('Vision Model', style: theme.textTheme.titleMedium),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Select the AI model for receipt processing',
+                      style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey),
+                    ),
+                    const SizedBox(height: 12),
+                    ...AiSettings.availableModels.map((m) {
+                      return RadioListTile<String>(
+                        title: Text(m['name']!),
+                        subtitle: Text(m['desc']!, style: theme.textTheme.bodySmall),
+                        value: m['id']!,
+                        groupValue: aiSettings.model,
+                        onChanged: (v) {
+                          if (v != null) {
+                            ref.read(aiSettingsProvider.notifier).setModel(v, userId);
+                          }
+                        },
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                      );
+                    }),
+                  ],
+                ),
               ),
             ),
             const SizedBox(height: 16),

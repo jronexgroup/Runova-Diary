@@ -534,6 +534,11 @@ class AiSettingsNotifier extends StateNotifier<AiSettings> {
     await save(userId);
   }
 
+  Future<void> setModel(String model, String userId) async {
+    state = state.copyWith(model: model);
+    await save(userId);
+  }
+
   Future<void> update(AiSettings updated, String userId) async {
     state = updated.copyWith(enabled: updated.apiKey.isNotEmpty);
     await save(userId);

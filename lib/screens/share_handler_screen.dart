@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 import '../providers/providers.dart';
 import '../services/ai_service.dart';
+import '../services/text_parser_service.dart';
 import '../utils/constants.dart';
 import '../widgets/ai_roadmap_dialog.dart';
 
@@ -17,6 +18,7 @@ class ShareHandlerScreen extends ConsumerStatefulWidget {
 
 class _ShareHandlerScreenState extends ConsumerState<ShareHandlerScreen> {
   String? _sharedFilePath;
+  String? _sharedText;
   bool _initialized = false;
   bool _loading = false;
 
@@ -27,6 +29,8 @@ class _ShareHandlerScreenState extends ConsumerState<ShareHandlerScreen> {
   }
 
   bool get _isImage => _sharedFilePath != null && _isImageFile(_sharedFilePath!);
+  bool get _isText => _sharedText != null && _sharedText!.isNotEmpty;
+  bool get _hasContent => _sharedFilePath != null || _isText;
 
   bool _isImageFile(String path) {
     final ext = path.split('.').last.toLowerCase();
@@ -34,31 +38,56 @@ class _ShareHandlerScreenState extends ConsumerState<ShareHandlerScreen> {
   }
 
   Future<void> _initShareReceiver() async {
-    final extraPath = GoRouterState.of(context).extra as String?;
-    if (extraPath != null) {
-      setState(() {
-        _sharedFilePath = extraPath;
-        _initialized = true;
-      });
-      return;
+    final extra = GoRouterState.of(context).extra;
+    if (extra != null) {
+      if (extra is String) {
+        if (extra.contains('\n') || extra.contains('Amount') || extra.contains('UPI')) {
+          setState(() {
+            _sharedText = extra;
+            _initialized = true;
+          });
+        } else {
+          setState(() {
+            _sharedFilePath = extra;
+            _initialized = true;
+          });
+        }
+        return;
+      }
     }
 
     final platformStream = ReceiveSharingIntent.instance.getMediaStream();
     platformStream.listen((List<SharedMediaFile> files) {
       if (files.isNotEmpty) {
-        setState(() {
-          _sharedFilePath = files.first.path;
-          _initialized = true;
-        });
+        final file = files.first;
+        if (file.type == SharedMediaType.text) {
+          setState(() {
+            _sharedText = file.path;
+            _initialized = true;
+          });
+        } else {
+          setState(() {
+            _sharedFilePath = file.path;
+            _initialized = true;
+          });
+        }
       }
     });
 
     final initialFiles = await ReceiveSharingIntent.instance.getInitialMedia();
     if (initialFiles.isNotEmpty) {
-      setState(() {
-        _sharedFilePath = initialFiles.first.path;
-        _initialized = true;
-      });
+      final file = initialFiles.first;
+      if (file.type == SharedMediaType.text) {
+        setState(() {
+          _sharedText = file.path;
+          _initialized = true;
+        });
+      } else {
+        setState(() {
+          _sharedFilePath = file.path;
+          _initialized = true;
+        });
+      }
       ReceiveSharingIntent.instance.reset();
     } else {
       setState(() => _initialized = true);
@@ -76,10 +105,10 @@ class _ShareHandlerScreenState extends ConsumerState<ShareHandlerScreen> {
       );
     }
 
-    if (_sharedFilePath == null) {
+    if (!_hasContent) {
       return Scaffold(
         appBar: AppBar(title: const Text('Runova Diary')),
-        body: const Center(child: Text('No file received')),
+        body: const Center(child: Text('No content received')),
       );
     }
 
@@ -96,15 +125,43 @@ class _ShareHandlerScreenState extends ConsumerState<ShareHandlerScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: _isImage
-                  ? ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: Image.file(File(_sharedFilePath!), height: 200, fit: BoxFit.cover),
-                    )
-                  : Icon(Icons.description, size: 80, color: theme.colorScheme.primary),
-            ),
+            if (_isImage)
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.file(File(_sharedFilePath!), height: 200, fit: BoxFit.cover),
+                ),
+              )
+            else if (_isText)
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.text_snippet, color: theme.colorScheme.primary),
+                          const SizedBox(width: 8),
+                          Text('Shared Text', style: theme.textTheme.titleMedium?.copyWith(
+                            color: theme.colorScheme.primary,
+                            fontWeight: FontWeight.bold,
+                          )),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Text(_sharedText!, style: theme.textTheme.bodyMedium),
+                    ],
+                  ),
+                ),
+              ),
             const SizedBox(height: 24),
             Text('Select transaction type', style: theme.textTheme.titleMedium),
             const SizedBox(height: 16),
@@ -134,6 +191,43 @@ class _ShareHandlerScreenState extends ConsumerState<ShareHandlerScreen> {
   }
 
   Future<void> _processWithType(TransactionType type) async {
+    if (_isText) {
+      _processText(type);
+    } else if (_sharedFilePath != null) {
+      _processImage(type);
+    }
+  }
+
+  void _processText(TransactionType type) {
+    final parser = TextParserService();
+    final result = parser.parse(_sharedText!);
+
+    if (!result.isSuccess) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(result.error ?? 'Could not parse text')),
+      );
+      return;
+    }
+
+    final accounts = ref.read(accountsProvider);
+    String? matchedId;
+    final lastFour = result.fields['lastFourDigits'];
+    if (lastFour != null) {
+      for (final acc in accounts) {
+        if (acc.id.length >= 4 && acc.id.endsWith(lastFour)) {
+          matchedId = acc.id;
+          break;
+        }
+      }
+    }
+
+    context.push('/new-transaction/${type.name}', extra: {
+      'fields': result.fields,
+      'matchedAccountId': matchedId,
+    });
+  }
+
+  Future<void> _processImage(TransactionType type) async {
     if (_sharedFilePath == null) return;
 
     final aiSettings = ref.read(aiSettingsProvider);

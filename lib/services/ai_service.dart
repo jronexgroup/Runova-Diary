@@ -58,7 +58,7 @@ class AiResult {
 class AiService {
   final AiSettings settings;
   static const _baseUrl = 'https://integrate.api.nvidia.com/v1';
-  static const _model = 'meta/llama-3.2-11b-vision-instruct';
+  String get _model => settings.model;
   static const _maxRetries = 2;
   static const _maxDimension = 640;
   static const _jpegQuality = 50;
