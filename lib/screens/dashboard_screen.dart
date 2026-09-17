@@ -128,14 +128,18 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               const SizedBox(height: 16),
               Text('Current Balances', style: theme.textTheme.titleLarge),
               const SizedBox(height: 8),
-              BalanceCard(
-                label: 'AEPS Balance',
-                opening: todayBalance?.aepsOpeningBalance ?? 0,
-                closing: todayBalance?.aepsClosingBalance ?? 0,
-                icon: Icons.account_balance,
-                color: theme.colorScheme.primary,
-              ),
-              ...accounts.map((acc) {
+              ...accounts.where((acc) => acc.isAeps).map((acc) {
+                final open = todayBalance?.getBalance(acc.id, closing: false) ?? 0;
+                final close = todayBalance?.getBalance(acc.id) ?? 0;
+                return BalanceCard(
+                  label: acc.name,
+                  opening: open,
+                  closing: close,
+                  icon: Icons.fingerprint,
+                  color: theme.colorScheme.primary,
+                );
+              }),
+              ...accounts.where((acc) => acc.isPhonePe).map((acc) {
                 final open = todayBalance?.getBalance(acc.id, closing: false) ?? 0;
                 final close = todayBalance?.getBalance(acc.id) ?? 0;
                 return BalanceCard(

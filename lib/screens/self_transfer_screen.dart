@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../models/bank_account.dart';
 import '../providers/providers.dart';
 import '../utils/constants.dart';
 
@@ -32,7 +33,13 @@ class _SelfTransferScreenState extends ConsumerState<SelfTransferScreen> {
   }
 
   double get _settlementCharge {
-    if (_fromAccountId != 'aeps') return 0;
+    if (_fromAccountId == null) return 0;
+    final accounts = ref.read(accountsProvider);
+    final fromAccount = accounts.firstWhere(
+      (acc) => acc.id == _fromAccountId,
+      orElse: () => BankAccount(id: '', name: '', holderName: '', bankName: ''),
+    );
+    if (!fromAccount.isAeps) return 0;
     final amt = double.tryParse(_amountCtrl.text);
     if (amt == null || amt <= 0) return 0;
     return ref.read(commissionServiceProvider).getSettlementCharge(amt,
@@ -63,7 +70,7 @@ class _SelfTransferScreenState extends ConsumerState<SelfTransferScreen> {
     final amount = double.parse(_amountCtrl.text.trim());
     final charge = _settlementCharge;
     final accounts = ref.watch(accountsProvider);
-    final labelMap = <String, String>{'aeps': 'AEPS'};
+    final labelMap = <String, String>{};
     for (final acc in accounts) {
       labelMap[acc.id] = acc.name;
     }
@@ -127,12 +134,13 @@ class _SelfTransferScreenState extends ConsumerState<SelfTransferScreen> {
                     spacing: 8,
                     runSpacing: 8,
                     children: [
-                      _accountChip('AEPS', Icons.account_balance, 'aeps', _fromAccountId,
-                          (v) => setState(() {
-                            _fromAccountId = v;
-                            if (_toAccountId == v) _toAccountId = null;
-                          })),
-                      ...accounts.map((acc) =>
+                      ...accounts.where((acc) => acc.isAeps).map((acc) =>
+                        _accountChip(acc.name, Icons.fingerprint, acc.id, _fromAccountId,
+                            (v) => setState(() {
+                              _fromAccountId = v;
+                              if (_toAccountId == v) _toAccountId = null;
+                            }))),
+                      ...accounts.where((acc) => acc.isPhonePe).map((acc) =>
                         _accountChip(acc.name, Icons.phone_android, acc.id, _fromAccountId,
                             (v) => setState(() {
                               _fromAccountId = v;
@@ -147,12 +155,13 @@ class _SelfTransferScreenState extends ConsumerState<SelfTransferScreen> {
                     spacing: 8,
                     runSpacing: 8,
                     children: [
-                      _accountChip('AEPS', Icons.account_balance, 'aeps', _toAccountId,
-                          (v) => setState(() {
-                            _toAccountId = v;
-                            if (_fromAccountId == v) _fromAccountId = null;
-                          })),
-                      ...accounts.map((acc) =>
+                      ...accounts.where((acc) => acc.isAeps).map((acc) =>
+                        _accountChip(acc.name, Icons.fingerprint, acc.id, _toAccountId,
+                            (v) => setState(() {
+                              _toAccountId = v;
+                              if (_fromAccountId == v) _fromAccountId = null;
+                            }))),
+                      ...accounts.where((acc) => acc.isPhonePe).map((acc) =>
                         _accountChip(acc.name, Icons.phone_android, acc.id, _toAccountId,
                             (v) => setState(() {
                               _toAccountId = v;

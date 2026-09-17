@@ -93,8 +93,9 @@ class _AdjustBalanceScreenState extends ConsumerState<AdjustBalanceScreen> {
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  _accountChip('AEPS', Icons.account_balance, 'aeps', theme),
-                  ...accounts.map((acc) =>
+                  ...accounts.where((acc) => acc.isAeps).map((acc) =>
+                    _accountChip(acc.name, Icons.fingerprint, acc.id, theme)),
+                  ...accounts.where((acc) => acc.isPhonePe).map((acc) =>
                     _accountChip(acc.name, Icons.phone_android, acc.id, theme)),
                 ],
               ),

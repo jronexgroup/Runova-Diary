@@ -104,7 +104,6 @@ class TransactionDetailScreen extends ConsumerWidget {
   }
 
   String _accountLabel(WidgetRef ref, String acct) {
-    if (acct == 'aeps') return 'AEPS';
     final accounts = ref.read(accountsProvider);
     final match = accounts.where((a) => a.id == acct);
     if (match.isNotEmpty) return match.first.name;

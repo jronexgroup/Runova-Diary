@@ -3,6 +3,8 @@ import 'package:uuid/uuid.dart';
 
 const _uuid = Uuid();
 
+enum AccountType { phonePe, aeps }
+
 @immutable
 class BankAccount {
   final String id;
@@ -13,6 +15,7 @@ class BankAccount {
   final String? accountNumber;
   final String? lastFourDigits;
   final bool isActive;
+  final AccountType accountType;
 
   const BankAccount({
     required this.id,
@@ -23,7 +26,11 @@ class BankAccount {
     this.accountNumber,
     this.lastFourDigits,
     this.isActive = true,
+    this.accountType = AccountType.phonePe,
   });
+
+  bool get isAeps => accountType == AccountType.aeps;
+  bool get isPhonePe => accountType == AccountType.phonePe;
 
   BankAccount copyWith({
     String? id,
@@ -34,6 +41,7 @@ class BankAccount {
     String? accountNumber,
     String? lastFourDigits,
     bool? isActive,
+    AccountType? accountType,
   }) {
     return BankAccount(
       id: id ?? this.id,
@@ -44,6 +52,7 @@ class BankAccount {
       accountNumber: accountNumber ?? this.accountNumber,
       lastFourDigits: lastFourDigits ?? this.lastFourDigits,
       isActive: isActive ?? this.isActive,
+      accountType: accountType ?? this.accountType,
     );
   }
 
@@ -56,6 +65,7 @@ class BankAccount {
     'accountNumber': accountNumber,
     'lastFourDigits': lastFourDigits,
     'isActive': isActive,
+    'accountType': accountType.name,
   };
 
   factory BankAccount.fromJson(Map<String, dynamic> json) {
@@ -68,6 +78,12 @@ class BankAccount {
       accountNumber: json['accountNumber'] as String?,
       lastFourDigits: json['lastFourDigits'] as String?,
       isActive: json['isActive'] as bool? ?? true,
+      accountType: json['accountType'] != null
+          ? AccountType.values.firstWhere(
+              (e) => e.name == json['accountType'],
+              orElse: () => AccountType.phonePe,
+            )
+          : AccountType.phonePe,
     );
   }
 
@@ -80,6 +96,7 @@ class BankAccount {
     String? accountNumber,
     String? lastFourDigits,
     bool isActive = true,
+    AccountType accountType = AccountType.phonePe,
   }) {
     return BankAccount(
       id: id ?? _uuid.v4(),
@@ -90,6 +107,7 @@ class BankAccount {
       accountNumber: accountNumber,
       lastFourDigits: lastFourDigits,
       isActive: isActive,
+      accountType: accountType,
     );
   }
 }

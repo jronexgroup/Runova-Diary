@@ -324,7 +324,7 @@ class BalancesNotifier extends StateNotifier<Map<String, DailyBalance>> {
     for (final txn in dayTxns) {
       switch (txn.type) {
         case TransactionType.aeps:
-          aepsClosing += txn.amount + txn.distributorCommission;
+          adjustBalance(resolveAccountId(txn), txn.amount + txn.distributorCommission);
         case TransactionType.cashIn:
           adjustBalance(resolveAccountId(txn), txn.amount);
         case TransactionType.cashOut:
@@ -380,6 +380,7 @@ class AccountsNotifier extends StateNotifier<List<BankAccount>> {
   List<BankAccount> _defaultAccounts() => [
     BankAccount.create(id: 'hasibul', name: 'Hasibul', holderName: '', bankName: 'PhonePe'),
     BankAccount.create(id: 'runaLaila', name: 'Runa Laila', holderName: '', bankName: 'PhonePe'),
+    BankAccount.create(id: 'aeps', name: 'AEPS', holderName: '', bankName: 'AEPS', accountType: AccountType.aeps),
   ];
 
   Future<void> save(String userId) async {

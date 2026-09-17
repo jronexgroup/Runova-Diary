@@ -246,9 +246,10 @@ class _NewTransactionScreenState extends ConsumerState<NewTransactionScreen> {
     if (_loading) return;
 
     final isPhonePeType = widget.type == TransactionType.cashIn || widget.type == TransactionType.cashOut;
-    if (isPhonePeType && _selectedAccountId == null) {
+    final isAepsType = widget.type == TransactionType.aeps;
+    if ((isPhonePeType || isAepsType) && _selectedAccountId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a bank account')),
+        SnackBar(content: Text(isAepsType ? 'Please select an AEPS account' : 'Please select a bank account')),
       );
       return;
     }
@@ -268,7 +269,8 @@ class _NewTransactionScreenState extends ConsumerState<NewTransactionScreen> {
             ranges: ref.read(commissionConfigsProvider.notifier).getDistributorRanges())
         : 0.0;
     if (widget.type == TransactionType.aeps) {
-      newBalance = (todayBalance?.aepsOpeningBalance ?? 0) + amount + distributorComm;
+      final currentBal = todayBalance?.getBalance(_selectedAccountId ?? '') ?? 0;
+      newBalance = currentBal + amount + distributorComm;
     } else if (widget.type == TransactionType.cashIn) {
       final currentBal = todayBalance?.getBalance(_selectedAccountId ?? '') ?? 0;
       newBalance = currentBal + amount;
@@ -350,9 +352,11 @@ class _NewTransactionScreenState extends ConsumerState<NewTransactionScreen> {
     final todayBalance = ref.read(balancesProvider)[todayKey];
 
     if (widget.type == TransactionType.aeps) {
+      if (_selectedAccountId == null) return null;
       final distributorComm = ref.read(commissionServiceProvider).getDistributorCommission(amount,
           ranges: ref.read(commissionConfigsProvider.notifier).getDistributorRanges());
-      return (todayBalance?.aepsClosingBalance ?? todayBalance?.aepsOpeningBalance ?? 0) + amount + distributorComm;
+      final currentBal = todayBalance?.getBalance(_selectedAccountId!) ?? 0;
+      return currentBal + amount + distributorComm;
     } else if (widget.type == TransactionType.cashIn) {
       if (_selectedAccountId == null) return null;
       final currentBal = todayBalance?.getBalance(_selectedAccountId!) ?? 0;
@@ -457,6 +461,21 @@ class _NewTransactionScreenState extends ConsumerState<NewTransactionScreen> {
                   const SizedBox(height: 16),
                 ],
                 if (isAEPS) ...[
+                  Text('Select AEPS Account *', style: theme.textTheme.labelLarge),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: accounts.where((acc) => acc.isAeps).map((acc) {
+                      final selected = _selectedAccountId == acc.id;
+                      return ChoiceChip(
+                        label: Text(acc.name),
+                        selected: selected,
+                        onSelected: (v) => setState(() => _selectedAccountId = v ? acc.id : null),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 16),
                   Card(
                     color: theme.colorScheme.surfaceContainerHighest,
                     child: Padding(

@@ -212,9 +212,10 @@ class _EditTransactionScreenState extends ConsumerState<EditTransactionScreen> {
     if (_loading) return;
 
     final isPhonePeType = _original!.type == TransactionType.cashIn || _original!.type == TransactionType.cashOut;
-    if (isPhonePeType && _selectedAccountId == null) {
+    final isAepsType = _original!.type == TransactionType.aeps;
+    if ((isPhonePeType || isAepsType) && _selectedAccountId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a bank account')),
+        SnackBar(content: Text(isAepsType ? 'Please select an AEPS account' : 'Please select a bank account')),
       );
       return;
     }
@@ -363,6 +364,21 @@ class _EditTransactionScreenState extends ConsumerState<EditTransactionScreen> {
                 const SizedBox(height: 16),
               ],
               if (isAEPS) ...[
+                Text('AEPS Account *', style: theme.textTheme.labelLarge),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: accounts.where((acc) => acc.isAeps).map((acc) {
+                    final selected = _selectedAccountId == acc.id;
+                    return ChoiceChip(
+                      label: Text(acc.name),
+                      selected: selected,
+                      onSelected: (v) => setState(() => _selectedAccountId = v ? acc.id : null),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 16),
                 TextFormField(
                   controller: _aadhaarController,
                   keyboardType: TextInputType.number,
