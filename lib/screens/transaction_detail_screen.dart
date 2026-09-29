@@ -27,6 +27,7 @@ class TransactionDetailScreen extends ConsumerWidget {
       TransactionType.aeps => Colors.blue,
       TransactionType.cashIn => Colors.green,
       TransactionType.cashOut => Colors.orange,
+      TransactionType.aepsCashIn => Colors.teal,
       TransactionType.balanceAdjustment => Colors.purple,
       TransactionType.selfTransfer => Colors.indigo,
     };

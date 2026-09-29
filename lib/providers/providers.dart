@@ -133,6 +133,8 @@ class TransactionsNotifier extends StateNotifier<List<Transaction>> {
     String? fromAccount,
     String? toAccount,
     double? distributorCommission,
+    String? village,
+    String? utr,
   }) async {
     final txn = Transaction.create(
       type: type,
@@ -152,6 +154,8 @@ class TransactionsNotifier extends StateNotifier<List<Transaction>> {
       fromAccount: fromAccount,
       toAccount: toAccount,
       distributorCommission: distributorCommission,
+      village: village,
+      utr: utr,
     );
     final hive = _ref.read(hiveServiceProvider);
     await hive.saveTransaction(txn);
@@ -327,6 +331,8 @@ class BalancesNotifier extends StateNotifier<Map<String, DailyBalance>> {
           adjustBalance(resolveAccountId(txn), txn.amount + txn.distributorCommission);
         case TransactionType.cashIn:
           adjustBalance(resolveAccountId(txn), txn.amount);
+        case TransactionType.aepsCashIn:
+          adjustBalance(resolveAccountId(txn), txn.amount);
         case TransactionType.cashOut:
           adjustBalance(resolveAccountId(txn), -txn.amount);
         case TransactionType.balanceAdjustment:
@@ -437,7 +443,8 @@ class CommissionConfigsNotifier extends StateNotifier<Map<String, dynamic>> {
     final json = _ref.read(hiveServiceProvider).getCommissionConfigsJson(userId);
     if (json != null) {
       try {
-        state = jsonDecode(json) as Map<String, dynamic>;
+        final loaded = jsonDecode(json) as Map<String, dynamic>;
+        state = {..._defaults(), ...loaded};
         return;
       } catch (_) {}
     }
@@ -446,6 +453,7 @@ class CommissionConfigsNotifier extends StateNotifier<Map<String, dynamic>> {
 
   Map<String, dynamic> _defaults() => {
     'aeps': const AepsCommissionConfig().toJson(),
+    'aepsCashIn': const CommissionConfig().toJson(),
     'distributor': DistributorRange.defaults.map((r) => r.toJson()).toList(),
     'settlement': SettlementRange.defaults.map((r) => r.toJson()).toList(),
   };
@@ -470,6 +478,19 @@ class CommissionConfigsNotifier extends StateNotifier<Map<String, dynamic>> {
       return AepsCommissionConfig.fromJson(data as Map<String, dynamic>);
     }
     return const AepsCommissionConfig();
+  }
+
+  CommissionConfig getAepsCashInConfig() {
+    final data = state['aepsCashIn'];
+    if (data != null) {
+      return CommissionConfig.fromJson(data as Map<String, dynamic>);
+    }
+    return const CommissionConfig();
+  }
+
+  Future<void> setAepsCashInConfig(CommissionConfig config, String userId) async {
+    state = {...state, 'aepsCashIn': config.toJson()};
+    await save(userId);
   }
 
   List<DistributorRange> getDistributorRanges() {

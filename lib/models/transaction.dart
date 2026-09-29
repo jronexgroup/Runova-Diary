@@ -25,6 +25,8 @@ class Transaction {
   final String? account;
   final String? fromAccount;
   final String? toAccount;
+  final String? village;
+  final String? utr;
 
   const Transaction({
     required this.id,
@@ -46,6 +48,8 @@ class Transaction {
     this.account,
     this.fromAccount,
     this.toAccount,
+    this.village,
+    this.utr,
   });
 
   Transaction copyWith({
@@ -68,6 +72,8 @@ class Transaction {
     String? account,
     String? fromAccount,
     String? toAccount,
+    String? village,
+    String? utr,
   }) {
     return Transaction(
       id: id ?? this.id,
@@ -89,6 +95,8 @@ class Transaction {
       account: account ?? this.account,
       fromAccount: fromAccount ?? this.fromAccount,
       toAccount: toAccount ?? this.toAccount,
+      village: village ?? this.village,
+      utr: utr ?? this.utr,
     );
   }
 
@@ -112,12 +120,17 @@ class Transaction {
     'account': account,
     'fromAccount': fromAccount,
     'toAccount': toAccount,
+    'village': village,
+    'utr': utr,
   };
 
   factory Transaction.fromJson(Map<String, dynamic> json, {String? idOverride}) {
     return Transaction(
       id: idOverride ?? json['id'] as String,
-      type: TransactionType.values.firstWhere((e) => e.name == json['type']),
+      type: TransactionType.values.firstWhere(
+        (e) => e.name == json['type'],
+        orElse: () => TransactionType.aeps,
+      ),
       customerName: json['customerName'] as String,
       amount: (json['amount'] as num).toDouble(),
       commission: (json['commission'] as num).toDouble(),
@@ -129,7 +142,10 @@ class Transaction {
       notes: json['notes'] as String?,
       bankName: json['bankName'] as String?,
       phonePeAccount: json['phonePeAccount'] != null
-          ? PhonePeAccount.values.firstWhere((e) => e.name == json['phonePeAccount'])
+          ? PhonePeAccount.values.firstWhere(
+              (e) => e.name == json['phonePeAccount'],
+              orElse: () => PhonePeAccount.hasibul,
+            )
           : null,
       balanceAfterTransaction: (json['balanceAfterTransaction'] as num).toDouble(),
       createdAt: DateTime.parse(json['createdAt'] as String),
@@ -137,6 +153,8 @@ class Transaction {
       account: json['account'] as String?,
       fromAccount: json['fromAccount'] as String?,
       toAccount: json['toAccount'] as String?,
+      village: json['village'] as String?,
+      utr: json['utr'] as String?,
     );
   }
 
@@ -158,6 +176,8 @@ class Transaction {
     String? account,
     String? fromAccount,
     String? toAccount,
+    String? village,
+    String? utr,
   }) {
     final now = DateTime.now();
     final commissionValue = commission ?? 0;
@@ -181,6 +201,8 @@ class Transaction {
       account: account,
       fromAccount: fromAccount,
       toAccount: toAccount,
+      village: village,
+      utr: utr,
     );
   }
 }

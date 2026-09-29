@@ -37,6 +37,19 @@ class _CommissionSettingsScreenState extends ConsumerState<CommissionSettingsScr
           Card(
             child: ListTile(
               leading: CircleAvatar(
+                backgroundColor: Colors.teal.withValues(alpha: 0.2),
+                child: const Icon(Icons.fingerprint, color: Colors.teal),
+              ),
+              title: const Text('AEPS Cash In Commission'),
+              subtitle: Text('${ref.watch(commissionConfigsProvider.notifier).getAepsCashInConfig().cashInRanges.length} ranges'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => context.push('/commission-settings/aeps-cash-in'),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Card(
+            child: ListTile(
+              leading: CircleAvatar(
                 backgroundColor: Colors.orange.withValues(alpha: 0.2),
                 child: const Icon(Icons.receipt_long, color: Colors.orange),
               ),

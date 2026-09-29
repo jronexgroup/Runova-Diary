@@ -25,6 +25,8 @@ class _EditTransactionScreenState extends ConsumerState<EditTransactionScreen> {
   final _aadhaarController = TextEditingController();
   final _mobileController = TextEditingController();
   final _txnIdController = TextEditingController();
+  final _utrController = TextEditingController();
+  final _villageController = TextEditingController();
   final _notesController = TextEditingController();
   final _bankNameController = TextEditingController();
   final _commissionController = TextEditingController();
@@ -52,6 +54,8 @@ class _EditTransactionScreenState extends ConsumerState<EditTransactionScreen> {
     _aadhaarController.text = txn.aadhaarNumber ?? '';
     _mobileController.text = txn.mobileNumber ?? '';
     _txnIdController.text = txn.transactionId ?? '';
+    _utrController.text = txn.utr ?? '';
+    _villageController.text = txn.village ?? '';
     _notesController.text = txn.notes ?? '';
     _bankNameController.text = txn.bankName ?? '';
     _commissionController.text = txn.commission.toStringAsFixed(2);
@@ -66,6 +70,8 @@ class _EditTransactionScreenState extends ConsumerState<EditTransactionScreen> {
     _aadhaarController.dispose();
     _mobileController.dispose();
     _txnIdController.dispose();
+    _utrController.dispose();
+    _villageController.dispose();
     _notesController.dispose();
     _bankNameController.dispose();
     _commissionController.dispose();
@@ -77,10 +83,20 @@ class _EditTransactionScreenState extends ConsumerState<EditTransactionScreen> {
     if (amount == null || amount <= 0) return null;
     if (!_autoCommission) return null;
     if (_original == null) return null;
+
+    final commissionService = ref.read(commissionServiceProvider);
+
+    if (_original!.type == TransactionType.aepsCashIn) {
+      final aepsCashInCfg = ref.read(commissionConfigsProvider.notifier).getAepsCashInConfig();
+      return commissionService.calculateCommission(amount, _original!.type,
+          aepsCashInRanges: aepsCashInCfg.cashInRanges,
+          aepsCashInPerThousand: aepsCashInCfg.cashInPerThousand);
+    }
+
     final cfg = _selectedAccountId != null
         ? ref.read(commissionConfigsProvider.notifier).getAccountConfig(_selectedAccountId!)
         : null;
-    return ref.read(commissionServiceProvider).calculateCommission(amount, _original!.type,
+    return commissionService.calculateCommission(amount, _original!.type,
         cashInRanges: cfg?.cashInRanges,
         cashOutRanges: cfg?.cashOutRanges,
         cashInPerThousand: cfg?.cashInPerThousand,
@@ -213,9 +229,11 @@ class _EditTransactionScreenState extends ConsumerState<EditTransactionScreen> {
 
     final isPhonePeType = _original!.type == TransactionType.cashIn || _original!.type == TransactionType.cashOut;
     final isAepsType = _original!.type == TransactionType.aeps;
-    if ((isPhonePeType || isAepsType) && _selectedAccountId == null) {
+    final isAepsCashInType = _original!.type == TransactionType.aepsCashIn;
+    if ((isPhonePeType || isAepsType || isAepsCashInType) && _selectedAccountId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(isAepsType ? 'Please select an AEPS account' : 'Please select a bank account')),
+        SnackBar(content: Text(
+            isAepsType || isAepsCashInType ? 'Please select an AEPS account' : 'Please select a bank account')),
       );
       return;
     }
@@ -257,6 +275,8 @@ class _EditTransactionScreenState extends ConsumerState<EditTransactionScreen> {
           : _bankNameController.text.trim(),
       phonePeAccount: null,
       account: _selectedAccountId,
+      utr: _utrController.text.trim().isEmpty ? null : _utrController.text.trim(),
+      village: _villageController.text.trim().isEmpty ? null : _villageController.text.trim(),
     );
 
     try {
@@ -290,6 +310,8 @@ class _EditTransactionScreenState extends ConsumerState<EditTransactionScreen> {
     final isPhonePe = _original!.type == TransactionType.cashIn ||
         _original!.type == TransactionType.cashOut;
     final isAEPS = _original!.type == TransactionType.aeps;
+    final isAepsCashIn = _original!.type == TransactionType.aepsCashIn;
+    final isAepsFamily = isAEPS || isAepsCashIn;
     final accounts = ref.watch(accountsProvider);
     ref.watch(commissionConfigsProvider);
 
@@ -363,7 +385,7 @@ class _EditTransactionScreenState extends ConsumerState<EditTransactionScreen> {
                 ),
                 const SizedBox(height: 16),
               ],
-              if (isAEPS) ...[
+              if (isAepsFamily) ...[
                 Text('AEPS Account *', style: theme.textTheme.labelLarge),
                 const SizedBox(height: 8),
                 Wrap(
@@ -379,20 +401,22 @@ class _EditTransactionScreenState extends ConsumerState<EditTransactionScreen> {
                   }).toList(),
                 ),
                 const SizedBox(height: 16),
-                TextFormField(
-                  controller: _aadhaarController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Aadhaar Number *',
-                    prefixIcon: Icon(Icons.credit_card),
+                if (isAEPS) ...[
+                  TextFormField(
+                    controller: _aadhaarController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Aadhaar Number *',
+                      prefixIcon: Icon(Icons.credit_card),
+                    ),
+                    validator: (v) {
+                      if (v?.trim().isEmpty ?? true) return 'Aadhaar number required';
+                      if (v!.trim().length < 12) return 'Aadhaar must be 12 digits';
+                      return null;
+                    },
                   ),
-                  validator: (v) {
-                    if (v?.trim().isEmpty ?? true) return 'Aadhaar number required';
-                    if (v!.trim().length < 12) return 'Aadhaar must be 12 digits';
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
+                  const SizedBox(height: 16),
+                ],
               ],
               TextFormField(
                 controller: _bankNameController,
@@ -424,18 +448,62 @@ class _EditTransactionScreenState extends ConsumerState<EditTransactionScreen> {
               TextFormField(
                 controller: _mobileController,
                 keyboardType: TextInputType.phone,
-                decoration: const InputDecoration(
-                  labelText: 'Mobile Number (optional)',
-                  prefixIcon: Icon(Icons.phone),
+                decoration: InputDecoration(
+                  labelText: isAepsCashIn
+                      ? 'Phone No *'
+                      : 'Mobile Number (optional)',
+                  prefixIcon: const Icon(Icons.phone),
                 ),
+                validator: (v) {
+                  if (isAepsCashIn && (v?.trim().isEmpty ?? true)) return 'Phone number required';
+                  return null;
+                },
               ),
               const SizedBox(height: 16),
+              if (isAepsCashIn) ...[
+                TextFormField(
+                  controller: _villageController,
+                  decoration: const InputDecoration(
+                    labelText: 'Village *',
+                    prefixIcon: Icon(Icons.location_on),
+                  ),
+                  textCapitalization: TextCapitalization.words,
+                  validator: (v) =>
+                      v?.trim().isEmpty ?? true ? 'Village required' : null,
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _utrController,
+                  decoration: const InputDecoration(
+                    labelText: 'UTR / Reference *',
+                    prefixIcon: Icon(Icons.tag),
+                  ),
+                  validator: (v) =>
+                      v?.trim().isEmpty ?? true ? 'UTR / Reference required' : null,
+                ),
+                const SizedBox(height: 16),
+              ] else if (isAepsFamily) ...[
+                TextFormField(
+                  controller: _utrController,
+                  decoration: const InputDecoration(
+                    labelText: 'UTR / Reference (optional)',
+                    prefixIcon: Icon(Icons.tag),
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
               TextFormField(
                 controller: _txnIdController,
-                decoration: const InputDecoration(
-                  labelText: 'Transaction ID (optional)',
-                  prefixIcon: Icon(Icons.receipt),
+                decoration: InputDecoration(
+                  labelText: isAepsCashIn
+                      ? 'Txn ID *'
+                      : (isAEPS ? 'Txn ID (optional)' : 'Transaction ID (optional)'),
+                  prefixIcon: const Icon(Icons.receipt),
                 ),
+                validator: (v) {
+                  if (isAepsCashIn && (v?.trim().isEmpty ?? true)) return 'Txn ID required';
+                  return null;
+                },
               ),
               const SizedBox(height: 16),
               TextFormField(

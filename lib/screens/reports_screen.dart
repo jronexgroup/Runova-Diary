@@ -55,6 +55,8 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     final totalAmount = filtered.fold(0.0, (s, t) => s + t.amount);
     final aepsTotal = filtered.where((t) => t.type == TransactionType.aeps)
         .fold(0.0, (s, t) => s + t.amount);
+    final aepsCashInTotal = filtered.where((t) => t.type == TransactionType.aepsCashIn)
+        .fold(0.0, (s, t) => s + t.amount);
     final cashInTotal = filtered.where((t) => t.type == TransactionType.cashIn)
         .fold(0.0, (s, t) => s + t.amount);
     final cashOutTotal = filtered.where((t) => t.type == TransactionType.cashOut)
@@ -143,6 +145,8 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                   const Divider(),
                   _reportRow('AEPS Total', '₹${aepsTotal.toStringAsFixed(2)}'),
                   const Divider(),
+                  _reportRow('AEPS Cash In Total', '₹${aepsCashInTotal.toStringAsFixed(2)}'),
+                  const Divider(),
                   _reportRow('Cash In Total', '₹${cashInTotal.toStringAsFixed(2)}'),
                   const Divider(),
                   _reportRow('Cash Out Total', '₹${cashOutTotal.toStringAsFixed(2)}'),
@@ -194,6 +198,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                         TransactionType.aeps => 'A',
                         TransactionType.cashIn => 'I',
                         TransactionType.cashOut => 'O',
+                        TransactionType.aepsCashIn => 'ACI',
                         TransactionType.balanceAdjustment => 'ADJ',
                         TransactionType.selfTransfer => 'TRF',
                       },
@@ -287,6 +292,8 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
         return Colors.green;
       case TransactionType.cashOut:
         return Colors.orange;
+      case TransactionType.aepsCashIn:
+        return Colors.teal;
       case TransactionType.balanceAdjustment:
         return Colors.purple;
       case TransactionType.selfTransfer:

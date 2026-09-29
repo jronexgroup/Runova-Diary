@@ -20,6 +20,7 @@ import '../screens/aeps_commission_screen.dart';
 import '../screens/distributor_commission_screen.dart';
 import '../screens/settlement_charge_screen.dart';
 import '../screens/account_commission_screen.dart';
+import '../screens/aeps_cashin_commission_screen.dart';
 import '../screens/change_pin_screen.dart';
 import '../screens/adjust_balance_screen.dart';
 import '../screens/self_transfer_screen.dart';
@@ -134,6 +135,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/commission-settings/settlement',
         builder: (_, __) => const SettlementChargeScreen(),
+      ),
+      GoRoute(
+        path: '/commission-settings/aeps-cash-in',
+        builder: (_, __) => const AepsCashInCommissionScreen(),
       ),
       GoRoute(
         path: '/commission-settings/account/:id',

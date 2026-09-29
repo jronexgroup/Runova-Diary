@@ -54,6 +54,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final aepsTxns = todayTxns.where((t) => t.type == TransactionType.aeps).toList();
     final cashInTxns = todayTxns.where((t) => t.type == TransactionType.cashIn).toList();
     final cashOutTxns = todayTxns.where((t) => t.type == TransactionType.cashOut).toList();
+    final aepsCashInTxns = todayTxns.where((t) => t.type == TransactionType.aepsCashIn).toList();
     final todayCommission = todayTxns
         .where((t) => t.type != TransactionType.selfTransfer)
         .fold(0.0, (sum, t) => sum + t.commission + t.distributorCommission);
@@ -111,6 +112,20 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   ),
                 ],
               ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: SummaryCard(
+                      title: 'AEPS Cash In',
+                      count: aepsCashInTxns.length,
+                      amount: aepsCashInTxns.fold(0.0, (s, t) => s + t.amount),
+                      icon: Icons.fingerprint,
+                      color: Colors.teal,
+                    ),
+                  ),
+                ],
+              ),
               const SizedBox(height: 12),
               Card(
                 child: ListTile(
@@ -164,6 +179,19 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     ),
                   ),
                   const SizedBox(width: 8),
+                  Expanded(
+                    child: QuickActionButton(
+                      label: 'AEPS Cash In',
+                      icon: Icons.fingerprint,
+                      color: Colors.teal,
+                      onTap: () => context.push('/new-transaction/${TransactionType.aepsCashIn.name}'),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
                   Expanded(
                     child: QuickActionButton(
                       label: 'Cash In',

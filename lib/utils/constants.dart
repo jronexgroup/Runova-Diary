@@ -20,6 +20,7 @@ enum TransactionType {
   aeps,
   cashIn,
   cashOut,
+  aepsCashIn,
   balanceAdjustment,
   selfTransfer;
 
@@ -31,6 +32,8 @@ enum TransactionType {
         return 'Cash In';
       case TransactionType.cashOut:
         return 'Cash Out';
+      case TransactionType.aepsCashIn:
+        return 'AEPS Cash In';
       case TransactionType.balanceAdjustment:
         return 'Balance Adjustment';
       case TransactionType.selfTransfer:

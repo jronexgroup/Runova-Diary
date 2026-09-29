@@ -170,6 +170,8 @@ class _ShareHandlerScreenState extends ConsumerState<ShareHandlerScreen> {
             _typeButton(context, 'PhonePe Cash Out', Icons.remove_circle, Colors.orange, TransactionType.cashOut),
             const SizedBox(height: 12),
             _typeButton(context, 'AEPS Transaction', Icons.fingerprint, Colors.purple, TransactionType.aeps),
+            const SizedBox(height: 12),
+            _typeButton(context, 'AEPS Cash In', Icons.fingerprint, Colors.teal, TransactionType.aepsCashIn),
           ],
         ),
       ),

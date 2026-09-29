@@ -13,8 +13,10 @@ class CommissionService {
       {double? cashInPerThousand,
       double? cashOutPerThousand,
       double? aepsPerThousand,
+      double? aepsCashInPerThousand,
       List<CommissionRange>? cashInRanges,
-      List<CommissionRange>? cashOutRanges}) {
+      List<CommissionRange>? cashOutRanges,
+      List<CommissionRange>? aepsCashInRanges}) {
     if (amount <= 0) return 0;
 
     if (type == TransactionType.cashIn && cashInRanges != null && cashInRanges.isNotEmpty) {
@@ -27,16 +29,24 @@ class CommissionService {
       if (rangeRate > 0) return rangeRate;
     }
 
+    if (type == TransactionType.aepsCashIn && aepsCashInRanges != null && aepsCashInRanges.isNotEmpty) {
+      final rangeRate = _rateFromRanges(amount, aepsCashInRanges);
+      if (rangeRate > 0) return rangeRate;
+    }
+
     double perThousand;
     if (type == TransactionType.cashIn && cashInRanges != null && cashInRanges.isNotEmpty) {
       perThousand = cashInPerThousand ?? 10;
     } else if (type == TransactionType.cashOut && cashOutRanges != null && cashOutRanges.isNotEmpty) {
       perThousand = cashOutPerThousand ?? 10;
+    } else if (type == TransactionType.aepsCashIn && aepsCashInRanges != null && aepsCashInRanges.isNotEmpty) {
+      perThousand = aepsCashInPerThousand ?? 10;
     } else {
       perThousand = switch (type) {
         TransactionType.aeps => aepsPerThousand ?? 10.0,
         TransactionType.cashIn => cashInPerThousand ?? 10.0,
         TransactionType.cashOut => cashOutPerThousand ?? 10.0,
+        TransactionType.aepsCashIn => aepsCashInPerThousand ?? 10.0,
         _ => 0.0,
       };
     }

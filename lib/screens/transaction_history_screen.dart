@@ -248,6 +248,8 @@ class _TransactionHistoryScreenState
         return Colors.green;
       case TransactionType.cashOut:
         return Colors.orange;
+      case TransactionType.aepsCashIn:
+        return Colors.teal;
       case TransactionType.balanceAdjustment:
         return Colors.purple;
       case TransactionType.selfTransfer:
@@ -263,6 +265,8 @@ class _TransactionHistoryScreenState
         return 'IN';
       case TransactionType.cashOut:
         return 'OUT';
+      case TransactionType.aepsCashIn:
+        return 'ACI';
       case TransactionType.balanceAdjustment:
         return 'ADJ';
       case TransactionType.selfTransfer:
