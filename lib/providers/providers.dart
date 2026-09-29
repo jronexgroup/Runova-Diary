@@ -369,6 +369,20 @@ class AccountsNotifier extends StateNotifier<List<BankAccount>> {
         final list = (jsonDecode(json) as List)
             .map((j) => BankAccount.fromJson(j as Map<String, dynamic>))
             .toList();
+
+        if (!list.any((a) => a.id == 'aeps')) {
+          list.insert(0, BankAccount.create(
+            id: 'aeps',
+            name: 'AEPS',
+            holderName: '',
+            bankName: 'AEPS',
+            accountType: AccountType.aeps,
+          ));
+          state = list;
+          await save(userId);
+          return;
+        }
+
         state = list;
         return;
       } catch (_) {}
