@@ -89,6 +89,14 @@ class AiService {
 
     _log.info('processDocument: $filePath');
 
+    if (filePath.toLowerCase().endsWith('.pdf')) {
+      _log.warn('PDF passed to AI service — rejected (PDFs are parsed locally)');
+      return AiResult(
+        fields: {},
+        error: 'PDF files cannot be processed by AI. PDF receipts are parsed automatically when shared.',
+      );
+    }
+
     try {
       onProgress?.call(AiProgressStep.readingImage, 'Reading image...');
       final file = File(filePath);

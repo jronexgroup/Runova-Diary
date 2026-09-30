@@ -48,6 +48,7 @@ dependencies:
   receive_sharing_intent: ^1.8.1
   archive: ^4.0.2
   image: ^4.8.0
+  syncfusion_flutter_pdf: ^35.1.37
 
 dev_dependencies:
   flutter_test:

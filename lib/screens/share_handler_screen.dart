@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 import '../providers/providers.dart';
 import '../services/ai_service.dart';
+import '../services/pdf_parser_service.dart';
 import '../services/text_parser_service.dart';
 import '../utils/constants.dart';
 import '../widgets/ai_roadmap_dialog.dart';
@@ -21,6 +22,9 @@ class _ShareHandlerScreenState extends ConsumerState<ShareHandlerScreen> {
   String? _sharedText;
   bool _initialized = false;
   bool _loading = false;
+  bool _pdfHandled = false;
+  Map<String, dynamic>? _pdfFields;
+  TransactionType? _pdfType;
 
   @override
   void initState() {
@@ -29,6 +33,7 @@ class _ShareHandlerScreenState extends ConsumerState<ShareHandlerScreen> {
   }
 
   bool get _isImage => _sharedFilePath != null && _isImageFile(_sharedFilePath!);
+  bool get _isPdf => _sharedFilePath != null && _sharedFilePath!.toLowerCase().endsWith('.pdf');
   bool get _isText => _sharedText != null && _sharedText!.isNotEmpty;
   bool get _hasContent => _sharedFilePath != null || _isText;
 
@@ -105,6 +110,12 @@ class _ShareHandlerScreenState extends ConsumerState<ShareHandlerScreen> {
       );
     }
 
+    if (_isPdf && !_pdfHandled && !_loading) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && !_pdfHandled && !_loading) _processPdf();
+      });
+    }
+
     if (!_hasContent) {
       return Scaffold(
         appBar: AppBar(title: const Text('Runova Diary')),
@@ -131,6 +142,31 @@ class _ShareHandlerScreenState extends ConsumerState<ShareHandlerScreen> {
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(12),
                   child: Image.file(File(_sharedFilePath!), height: 200, fit: BoxFit.cover),
+                ),
+              )
+            else if (_isPdf)
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.picture_as_pdf, size: 40, color: Colors.red.shade700),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          _sharedFilePath!.split('/').last,
+                          style: theme.textTheme.bodyMedium,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               )
             else if (_isText)
@@ -193,11 +229,77 @@ class _ShareHandlerScreenState extends ConsumerState<ShareHandlerScreen> {
   }
 
   Future<void> _processWithType(TransactionType type) async {
-    if (_isText) {
+    if (_isPdf) {
+      _openPdfForm(type);
+    } else if (_isText) {
       _processText(type);
     } else if (_sharedFilePath != null) {
       _processImage(type);
     }
+  }
+
+  Future<void> _processPdf({bool autoOpen = true}) async {
+    if (_sharedFilePath == null || (_pdfHandled && autoOpen)) return;
+    _pdfHandled = true;
+    setState(() => _loading = true);
+
+    final result = PdfParserService().parse(_sharedFilePath!);
+
+    if (!mounted) return;
+
+    if (!result.isSuccess) {
+      setState(() => _loading = false);
+      if (autoOpen) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(result.error ?? 'Could not read PDF')),
+        );
+      }
+      return;
+    }
+
+    _pdfFields = result.fields;
+    _pdfType = result.suggestedType;
+
+    final type = _pdfType;
+    if (autoOpen && type != null) {
+      _openPdfForm(type);
+    } else {
+      // Type unknown or manual selection in progress — let user pick.
+      setState(() => _loading = false);
+      if (autoOpen) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Receipt read. Select transaction type')),
+        );
+      }
+    }
+  }
+
+  void _openPdfForm(TransactionType type) {
+    final fields = _pdfFields;
+    if (fields == null) {
+      // First attempt failed — retry once, then open with user-selected type.
+      _processPdf(autoOpen: false).then((_) {
+        if (!mounted) return;
+        if (_pdfFields == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Could not read this PDF receipt')),
+          );
+          return;
+        }
+        _pushPdfForm(type);
+      });
+      return;
+    }
+    _pushPdfForm(type);
+  }
+
+  void _pushPdfForm(TransactionType type) {
+    context.push('/new-transaction/${type.name}', extra: {
+      'fields': _pdfFields,
+      'matchedAccountId': null,
+    }).then((_) {
+      if (mounted) Navigator.of(context).popUntil((route) => route.isFirst);
+    });
   }
 
   void _processText(TransactionType type) {
