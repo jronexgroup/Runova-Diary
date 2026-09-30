@@ -3,11 +3,17 @@ class AiSettings {
   final bool enabled;
   final String model;
 
-  static const String defaultModel = 'minimaxai/minimax-m3';
+  static const String defaultModel = 'google/diffusiongemma-26b-a4b-it';
 
   static const List<Map<String, String>> availableModels = [
-    {'id': 'minimaxai/minimax-m3', 'name': 'MiniMax M3', 'desc': 'Slow but accurate'},
-    {'id': 'meta/llama-3.2-11b-vision-instruct', 'name': 'Llama 3.2 11B', 'desc': 'Fast but inconsistent'},
+    {'id': 'google/diffusiongemma-26b-a4b-it', 'name': 'DiffusionGemma 26B', 'desc': 'Best accuracy, 15-30s'},
+    {'id': 'meta/llama-3.2-11b-vision-instruct', 'name': 'Llama 3.2 11B', 'desc': 'Fast (3-5s), good for quick scans'},
+    {'id': 'meta/llama-3.2-90b-vision-instruct', 'name': 'Llama 3.2 90B', 'desc': 'Larger, slower, may timeout'},
+    {'id': 'google/gemma-4-31b-it', 'name': 'Gemma 4 31B', 'desc': 'Experimental, may timeout'},
+    {'id': 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning', 'name': 'Nemotron 3 Nano Omni', 'desc': 'Experimental, often overloaded'},
+    {'id': 'z-ai/glm-5.3', 'name': 'GLM 5.3', 'desc': 'Experimental, may timeout'},
+    {'id': 'moonshotai/kimi-k3', 'name': 'Kimi K3', 'desc': 'Experimental, may timeout'},
+    {'id': 'deepseek-ai/deepseek-v4.1-flash', 'name': 'DeepSeek V4.1 Flash', 'desc': 'Experimental, may timeout'},
   ];
 
   const AiSettings({
@@ -32,10 +38,14 @@ class AiSettings {
 
   factory AiSettings.fromJson(Map<String, dynamic> json) {
     final apiKey = json['apiKey'] as String? ?? '';
+    final savedModel = json['model'] as String? ?? '';
+    final model = availableModels.any((m) => m['id'] == savedModel)
+        ? savedModel
+        : defaultModel;
     return AiSettings(
       apiKey: apiKey,
       enabled: json['enabled'] as bool? ?? apiKey.isNotEmpty,
-      model: json['model'] as String? ?? defaultModel,
+      model: model,
     );
   }
 

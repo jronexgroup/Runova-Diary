@@ -191,7 +191,7 @@ class AiService {
             },
             body: body,
           )
-          .timeout(const Duration(seconds: 30));
+          .timeout(const Duration(seconds: 60));
       _log.info('Response: ${resp.statusCode} in ${stopwatch.elapsedMilliseconds}ms');
 
       if (resp.statusCode == 429) {
