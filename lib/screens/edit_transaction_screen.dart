@@ -374,7 +374,7 @@ class _EditTransactionScreenState extends ConsumerState<EditTransactionScreen> {
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
-                  children: accounts.map((acc) {
+                  children: accounts.where((acc) => acc.isPhonePe).map((acc) {
                     final selected = _selectedAccountId == acc.id;
                     return ChoiceChip(
                       label: Text(acc.name),

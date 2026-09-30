@@ -480,7 +480,7 @@ class _NewTransactionScreenState extends ConsumerState<NewTransactionScreen> {
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
-                    children: accounts.map((acc) {
+                    children: accounts.where((acc) => acc.isPhonePe).map((acc) {
                       final selected = _selectedAccountId == acc.id;
                       return ChoiceChip(
                         label: Text(acc.name),

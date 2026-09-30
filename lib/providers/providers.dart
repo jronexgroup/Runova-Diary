@@ -410,7 +410,7 @@ class AccountsNotifier extends StateNotifier<List<BankAccount>> {
   }
 
   Future<void> addAccount(BankAccount account, String userId) async {
-    if (state.length >= 5) return;
+    if (state.length >= 10) return;
     state = [...state, account];
     await save(userId);
   }

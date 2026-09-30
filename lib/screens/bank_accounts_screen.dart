@@ -244,6 +244,13 @@ class _BankAccountsScreenState extends ConsumerState<BankAccountsScreen> {
             TextButton(
               onPressed: () async {
                 if (!formKey.currentState!.validate()) return;
+                if (existing == null && ref.read(accountsProvider).length >= 10) {
+                  Navigator.pop(c);
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    const SnackBar(content: Text('Maximum 10 accounts allowed')),
+                  );
+                  return;
+                }
                 final account = BankAccount.create(
                   id: existing?.id,
                   name: nameCtrl.text.trim(),
