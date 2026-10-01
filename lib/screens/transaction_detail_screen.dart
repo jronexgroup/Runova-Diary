@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../providers/providers.dart';
@@ -73,32 +74,36 @@ class TransactionDetailScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 16),
-          _detailTile(theme, 'Customer Name', txn.customerName, Icons.person),
-          _detailTile(theme, 'Amount', '₹${txn.amount.toStringAsFixed(2)}', Icons.currency_rupee),
+          _detailTile(context, theme, 'Customer Name', txn.customerName, Icons.person),
+          _detailTile(context, theme, 'Amount', '₹${txn.amount.toStringAsFixed(2)}', Icons.currency_rupee),
           if (txn.bankName != null)
-            _detailTile(theme, 'Bank Name', txn.bankName!, Icons.account_balance),
+            _detailTile(context, theme, 'Bank Name', txn.bankName!, Icons.account_balance),
           if (txn.aadhaarNumber != null)
-            _detailTile(theme, 'Aadhaar Number', txn.aadhaarNumber!, Icons.credit_card),
+            _detailTile(context, theme, 'Aadhaar Number', txn.aadhaarNumber!, Icons.credit_card),
           if (txn.mobileNumber != null)
-            _detailTile(theme, 'Mobile Number', txn.mobileNumber!, Icons.phone),
+            _detailTile(context, theme, 'Mobile Number', txn.mobileNumber!, Icons.phone),
           if (txn.transactionId != null)
-            _detailTile(theme, 'Transaction ID', txn.transactionId!, Icons.receipt),
+            _detailTile(context, theme, 'Transaction ID', txn.transactionId!, Icons.receipt),
+          if (txn.utr != null && txn.utr!.isNotEmpty)
+            _detailTile(context, theme, 'UTR / Reference', txn.utr!, Icons.tag, copyable: true),
+          if (txn.village != null && txn.village!.isNotEmpty)
+            _detailTile(context, theme, 'Village', txn.village!, Icons.location_on),
           if (txn.phonePeAccount != null)
-            _detailTile(theme, 'PhonePe Account', txn.phonePeAccount!.displayName, Icons.phone_android),
+            _detailTile(context, theme, 'PhonePe Account', txn.phonePeAccount!.displayName, Icons.phone_android),
           if (txn.account != null) ...[
-            _detailTile(theme, 'Account', _accountLabel(ref, txn.account!), Icons.account_balance),
+            _detailTile(context, theme, 'Account', _accountLabel(ref, txn.account!), Icons.account_balance),
           ],
           if (txn.fromAccount != null && txn.toAccount != null) ...[
-            _detailTile(theme, 'From', _accountLabel(ref, txn.fromAccount!), Icons.arrow_forward),
-            _detailTile(theme, 'To', _accountLabel(ref, txn.toAccount!), Icons.arrow_back),
+            _detailTile(context, theme, 'From', _accountLabel(ref, txn.fromAccount!), Icons.arrow_forward),
+            _detailTile(context, theme, 'To', _accountLabel(ref, txn.toAccount!), Icons.arrow_back),
           ],
-          _detailTile(theme, 'Balance After', '₹${txn.balanceAfterTransaction.toStringAsFixed(2)}', Icons.account_balance_wallet),
-          _detailTile(theme, 'Our Commission', '₹${txn.commission.toStringAsFixed(2)}', Icons.monetization_on),
+          _detailTile(context, theme, 'Balance After', '₹${txn.balanceAfterTransaction.toStringAsFixed(2)}', Icons.account_balance_wallet),
+          _detailTile(context, theme, 'Our Commission', '₹${txn.commission.toStringAsFixed(2)}', Icons.monetization_on),
           if (txn.distributorCommission > 0)
-            _detailTile(theme, 'Distributor Comm.', '₹${txn.distributorCommission.toStringAsFixed(2)}', Icons.people),
-          _detailTile(theme, 'Date & Time', txn.createdAt.displayDateTime, Icons.schedule),
+            _detailTile(context, theme, 'Distributor Comm.', '₹${txn.distributorCommission.toStringAsFixed(2)}', Icons.people),
+          _detailTile(context, theme, 'Date & Time', txn.createdAt.displayDateTime, Icons.schedule),
           if (txn.notes != null && txn.notes!.isNotEmpty)
-            _detailTile(theme, 'Notes', txn.notes!, Icons.notes),
+            _detailTile(context, theme, 'Notes', txn.notes!, Icons.notes),
         ],
       ),
     );
@@ -111,12 +116,33 @@ class TransactionDetailScreen extends ConsumerWidget {
     return acct;
   }
 
-  Widget _detailTile(ThemeData theme, String label, String value, IconData icon) {
+  Widget _detailTile(
+    BuildContext context,
+    ThemeData theme,
+    String label,
+    String value,
+    IconData icon, {
+    bool copyable = false,
+  }) {
     return Card(
       child: ListTile(
+        onTap: copyable
+            ? () {
+                Clipboard.setData(ClipboardData(text: value));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Copied "$value"'),
+                    duration: const Duration(seconds: 1),
+                  ),
+                );
+              }
+            : null,
         leading: Icon(icon, color: theme.colorScheme.primary),
         title: Text(label, style: theme.textTheme.bodySmall),
         subtitle: Text(value, style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w500)),
+        trailing: copyable
+            ? Icon(Icons.copy, size: 16, color: theme.colorScheme.onSurfaceVariant)
+            : null,
       ),
     );
   }

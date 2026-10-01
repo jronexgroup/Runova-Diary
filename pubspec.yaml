@@ -49,6 +49,7 @@ dependencies:
   archive: ^4.0.2
   image: ^4.8.0
   syncfusion_flutter_pdf: ^35.1.37
+  fl_chart: ^1.2.0
 
 dev_dependencies:
   flutter_test:
