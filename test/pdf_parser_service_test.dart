@@ -40,6 +40,30 @@ void main() {
     expect(r.fields!['transactionId'], '481386311');
   });
 
+  test('Relipay new layout (Txnid/Name) → AEPS Cash In', () {
+    final r = parser.parse('Receipt1790841316212.pdf');
+    expect(r.isSuccess, true);
+    expect(r.suggestedType, TransactionType.aepsCashIn);
+    expect(r.fields!['amount'], '5000');
+    expect(r.fields!['customerName'], 'NURUL HASAN');
+    expect(r.fields!['utr'], '574288284873');
+    expect(r.fields!['transactionId'], '838076563');
+    expect(r.fields!['mobileNumber'], isNull); // no Customer Mobile in new layout
+    expect(r.fields!['bankName'], isNull); // bank only in old layout (Remarks)
+  });
+
+  test('Mobisafr new layout (Remarks1/Reference1) → AEPS Cash In', () {
+    final r = parser.parse('TransactionSlip_481589185.0.pdf');
+    expect(r.isSuccess, true);
+    expect(r.suggestedType, TransactionType.aepsCashIn);
+    expect(r.fields!['amount'], '100');
+    expect(r.fields!['customerName'], 'Abu Huraira Sekh'); // Remarks3 = VPA name
+    expect(r.fields!['mobileNumber'], '9932464347'); // Remarks2
+    expect(r.fields!['utr'], '627406914415'); // Reference
+    expect(r.fields!['transactionId'], '481589185');
+    expect(r.fields!['bankName'], isNull); // no bank in new layout
+  });
+
   test('unsupported file rejected', () {
     final tmp = 'test/_unsupported_tmp.pdf';
     final doc = PdfDocument();

@@ -57,7 +57,14 @@ class PdfParserService {
         );
       }
 
-      final kv = brand == _relipay ? _relipayPairs(words) : _mobisafrPairs(words);
+      // New Mobisafr layout (Remarks1/Reference1) differs in columns AND
+      // label/value y-alignment — needs proximity row pairing.
+      final mobisafrNew = brand == _mobisafr &&
+          (plainText.contains('Remarks1') || plainText.contains('Reference1'));
+
+      final kv = brand == _relipay
+          ? _relipayPairs(words)
+          : (mobisafrNew ? _mobisafrNewPairs(words) : _mobisafrPairs(words));
       if (kv.isEmpty) {
         return const PdfParseResult(
           isSuccess: false,
@@ -65,7 +72,20 @@ class PdfParserService {
         );
       }
 
-      final fields = brand == _relipay ? _mapRelipay(kv) : _mapMobisafr(kv);
+      final status = kv['status'];
+      if (status != null) {
+        final s = status.toLowerCase();
+        if (!s.contains('success') && !s.contains('settled')) {
+          return PdfParseResult(
+            isSuccess: false,
+            error: 'Receipt status is "$status" — only successful transactions can be added.',
+          );
+        }
+      }
+
+      final fields = brand == _relipay
+          ? _mapRelipay(kv)
+          : (mobisafrNew ? _mapMobisafrNew(kv) : _mapMobisafr(kv));
       if (fields.isEmpty) {
         return const PdfParseResult(
           isSuccess: false,
@@ -88,7 +108,11 @@ class PdfParserService {
     if (lower.startsWith('receipt')) return _relipay;
     if (lower.startsWith('transactionslip')) return _mobisafr;
     if (text.contains('ReportType') || text.contains('Bank RRN')) return _relipay;
+    if (text.contains('CSP FIRM NAME')) return _relipay;
     if (text.contains('RR Number') || text.contains('AEPS Transaction Receipt')) {
+      return _mobisafr;
+    }
+    if (text.contains('Remarks1') || text.contains('Reference1') || text.contains('MOBISAFAR')) {
       return _mobisafr;
     }
     return null;
@@ -133,6 +157,29 @@ class PdfParserService {
     return pairs;
   }
 
+  /// Mobisafr new layout: label/value x-offsets differ from the old layout and
+  /// label/value y values are ~0.1-1.4px apart, which breaks fixed-bucket
+  /// row grouping — so rows are grouped by y-proximity instead.
+  Map<String, String> _mobisafrNewPairs(List<_Word> words) {
+    final sorted = [...words]..sort((a, b) => a.y.compareTo(b.y));
+    final rows = <List<_Word>>[];
+    for (final w in sorted) {
+      if (rows.isEmpty || (w.y - rows.last.first.y) > 3) {
+        rows.add([w]);
+      } else {
+        rows.last.add(w);
+      }
+    }
+
+    final pairs = <String, String>{};
+    for (final row in rows) {
+      row.sort((a, b) => a.x.compareTo(b.x));
+      _addPair(pairs, row, labelMin: 60, labelMax: 150, valueMin: 150, valueMax: 300);
+      _addPair(pairs, row, labelMin: 300, labelMax: 375, valueMin: 375, valueMax: 700);
+    }
+    return pairs;
+  }
+
   void _addPair(
     Map<String, String> pairs,
     List<_Word> row, {
@@ -164,6 +211,9 @@ class PdfParserService {
     final reportType = kv['reporttype'];
     if (reportType != null && reportType.toUpperCase().contains('AEPS')) {
       fields['__type'] = TransactionType.aeps;
+    } else if (kv['txnid'] != null && kv['name'] != null) {
+      // Relipay's newer receipt layout (Txnid/Name/Txndate) — AEPS Cash In.
+      fields['__type'] = TransactionType.aepsCashIn;
     }
 
     final amount = kv['amount'];
@@ -171,6 +221,11 @@ class PdfParserService {
 
     final bank = kv['bankname'] ?? kv['remarks'];
     if (bank != null) fields['bankName'] = bank;
+
+    final name = kv['name'];
+    if (name != null && name.trim().isNotEmpty) {
+      fields['customerName'] = name.trim();
+    }
 
     final mobile = kv['customermobile'];
     if (mobile != null) {
@@ -182,6 +237,51 @@ class PdfParserService {
     if (rrn != null) {
       final v = rrn.replaceAll(RegExp(r'\D'), '');
       if (v.isNotEmpty) fields['utr'] = v;
+    }
+
+    final txnId = kv['txnid'];
+    if (txnId != null) {
+      final v = txnId.replaceAll(RegExp(r'\D'), '');
+      if (v.isNotEmpty) fields['transactionId'] = v;
+    }
+
+    return fields;
+  }
+
+  /// Mobisafr's newer layout (Remarks1-4 / Reference / Status rows).
+  /// Customer = Remarks3 (matches VPA name), mobile = Remarks2.
+  Map<String, dynamic> _mapMobisafrNew(Map<String, String> kv) {
+    final fields = <String, dynamic>{};
+
+    final service = kv['service'];
+    fields['__type'] = (service != null && service.toUpperCase().contains('AEPS'))
+        ? TransactionType.aeps
+        : TransactionType.aepsCashIn;
+
+    final amount = kv['amount'];
+    if (amount != null) fields['amount'] = _cleanAmount(amount);
+
+    final name = kv['remarks3'];
+    if (name != null && name.trim().isNotEmpty) {
+      fields['customerName'] = name.trim();
+    }
+
+    final mobile = kv['remarks2'];
+    if (mobile != null) {
+      final v = _tenDigits(mobile);
+      if (v != null) fields['mobileNumber'] = v;
+    }
+
+    final rrn = kv['reference'];
+    if (rrn != null) {
+      final v = rrn.replaceAll(RegExp(r'\D'), '');
+      if (v.isNotEmpty) fields['utr'] = v;
+    }
+
+    final txnId = kv['txnid'];
+    if (txnId != null) {
+      final v = txnId.replaceAll(RegExp(r'\D'), '');
+      if (v.isNotEmpty) fields['transactionId'] = v;
     }
 
     return fields;
