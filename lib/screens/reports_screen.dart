@@ -613,7 +613,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     return match.isNotEmpty ? match.first.name : id;
   }
 
-  Widget _barChart(ThemeData theme, List<Transaction> filtered) {
+  Widget _lineChart(ThemeData theme, List<Transaction> filtered) {
     final buckets = _buildBuckets(filtered);
     if (buckets.isEmpty) {
       return _chartEmpty(theme);
@@ -636,29 +636,67 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
             ? (buckets.length / 8).ceil().clamp(1, 31)
             : (buckets.length / 10).ceil().clamp(1, 12);
 
-    return BarChart(
-      BarChartData(
+    String axisLabel(int i) {
+      if (isHourly) {
+        final h = int.parse(buckets[i].label);
+        if (h == 0) return '12a';
+        if (h < 12) return '${h}a';
+        if (h == 12) return '12p';
+        return '${h - 12}p';
+      }
+      if (isDaily) return buckets[i].label.substring(8);
+      final parts = buckets[i].label.split('-');
+      const mons = [
+        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      ];
+      final m = int.parse(parts[1]);
+      return '${mons[m - 1]} ${parts[0].substring(2)}';
+    }
+
+    return LineChart(
+      LineChartData(
+        minY: 0,
         maxY: maxY <= 0 ? 1 : maxY,
-        barGroups: [
-          for (var i = 0; i < buckets.length; i++)
-            BarChartGroupData(
-              x: i,
-              barRods: [
-                BarChartRodData(
-                  toY: buckets[i].value,
-                  width: isHourly ? 8 : 14,
-                  gradient: LinearGradient(
-                    begin: Alignment.bottomCenter,
-                    end: Alignment.topCenter,
-                    colors: [
-                      primary.withValues(alpha: 0.45),
-                      primary,
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(6),
-                ),
+        lineBarsData: [
+          LineChartBarData(
+            spots: [
+              for (var i = 0; i < buckets.length; i++)
+                FlSpot(i.toDouble(), buckets[i].value),
+            ],
+            isCurved: true,
+            preventCurveOverShooting: true,
+            barWidth: 3,
+            gradient: LinearGradient(
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+              colors: [
+                primary.withValues(alpha: 0.6),
+                primary,
               ],
             ),
+            dotData: FlDotData(
+              show: buckets.length <= 31,
+              getDotPainter: (spot, percent, bar, index) =>
+                  FlDotCirclePainter(
+                radius: 3,
+                color: theme.colorScheme.surface,
+                strokeWidth: 2,
+                strokeColor: primary,
+              ),
+            ),
+            belowBarData: BarAreaData(
+              show: true,
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  primary.withValues(alpha: 0.28),
+                  primary.withValues(alpha: 0.02),
+                ],
+              ),
+            ),
+          ),
         ],
         gridData: FlGridData(
           show: true,
@@ -669,35 +707,31 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
           ),
         ),
         borderData: FlBorderData(show: false),
-        barTouchData: BarTouchData(
+        lineTouchData: LineTouchData(
           enabled: true,
-          touchTooltipData: BarTouchTooltipData(
+          touchTooltipData: LineTouchTooltipData(
             getTooltipColor: (_) => theme.colorScheme.inverseSurface,
-            getTooltipItem: (group, groupIndex, rod, rodIndex) {
-              final label = isHourly
-                  ? '${buckets[group.x].label}:00'
-                  : isDaily
-                      ? buckets[group.x].label
-                      : buckets[group.x].label;
-              return BarTooltipItem(
-                '$label\n',
-                TextStyle(
-                  color: theme.colorScheme.onInverseSurface,
-                  fontWeight: FontWeight.w500,
-                  fontSize: 12,
-                ),
-                children: [
-                  TextSpan(
-                    text: '₹${rod.toY.toStringAsFixed(2)}',
-                    style: TextStyle(
-                      color: primary,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                    ),
+            getTooltipItems: (spots) => [
+              for (final s in spots)
+                LineTooltipItem(
+                  '${axisLabel(s.x.toInt())}\n',
+                  TextStyle(
+                    color: theme.colorScheme.onInverseSurface,
+                    fontWeight: FontWeight.w500,
+                    fontSize: 12,
                   ),
-                ],
-              );
-            },
+                  children: [
+                    TextSpan(
+                      text: '₹${s.y.toStringAsFixed(2)}',
+                      style: TextStyle(
+                        color: primary,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+            ],
           ),
         ),
         titlesData: FlTitlesData(
@@ -724,33 +758,10 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                 if (i % labelStep != 0 && i != buckets.length - 1) {
                   return const SizedBox.shrink();
                 }
-                String text;
-                if (isHourly) {
-                  final h = int.parse(buckets[i].label);
-                  text = h == 0
-                      ? '12a'
-                      : h < 12
-                          ? '${h}a'
-                          : h == 12
-                              ? '12p'
-                              : h == 24
-                                  ? ''
-                                  : '${h - 12}p';
-                } else if (isDaily) {
-                  text = buckets[i].label.substring(8);
-                } else {
-                  final parts = buckets[i].label.split('-');
-                  const mons = [
-                    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-                    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
-                  ];
-                  final m = int.parse(parts[1]);
-                  text = '${mons[m - 1]} ${parts[0].substring(2)}';
-                }
                 return Padding(
                   padding: const EdgeInsets.only(top: 6),
                   child: Text(
-                    text,
+                    axisLabel(i),
                     style: TextStyle(
                       fontSize: 10,
                       color: theme.colorScheme.onSurfaceVariant,
@@ -797,29 +808,29 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
       return _chartEmpty(theme);
     }
 
-    return Row(
+    return Column(
       children: [
         SizedBox(
-          width: 150,
-          height: 150,
+          height: 260,
+          width: double.infinity,
           child: Stack(
             alignment: Alignment.center,
             children: [
               PieChart(
                 PieChartData(
                   sectionsSpace: 3,
-                  centerSpaceRadius: 46,
+                  centerSpaceRadius: 74,
                   sections: [
                     for (final e in entries)
                       PieChartSectionData(
                         value: e.value,
                         color: _typeColor(e.key),
-                        radius: 26,
-                        title: (e.value / total * 100) >= 8
+                        radius: 46,
+                        title: (e.value / total * 100) >= 6
                             ? '${(e.value / total * 100).toStringAsFixed(0)}%'
                             : '',
                         titleStyle: const TextStyle(
-                          fontSize: 11,
+                          fontSize: 13,
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
                         ),
@@ -833,7 +844,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                 children: [
                   Text(
                     _compactAmount(total),
-                    style: theme.textTheme.titleSmall
+                    style: theme.textTheme.titleMedium
                         ?.copyWith(fontWeight: FontWeight.bold),
                   ),
                   Text(
@@ -847,45 +858,38 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
             ],
           ),
         ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              for (final e in entries) ...[
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 10,
-                        height: 10,
-                        decoration: BoxDecoration(
-                          color: _typeColor(e.key),
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          e.key.displayName,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodySmall,
-                        ),
-                      ),
-                      Text(
-                        _compactAmount(e.value),
-                        style: theme.textTheme.bodySmall
-                            ?.copyWith(fontWeight: FontWeight.w600),
-                      ),
-                    ],
+        const SizedBox(height: 8),
+        const Divider(),
+        for (final e in entries)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: Row(
+              children: [
+                Container(
+                  width: 10,
+                  height: 10,
+                  decoration: BoxDecoration(
+                    color: _typeColor(e.key),
+                    shape: BoxShape.circle,
                   ),
                 ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    e.key.displayName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodyMedium,
+                  ),
+                ),
+                Text(
+                  '${_compactAmount(e.value)}  •  ${(e.value / total * 100).toStringAsFixed(0)}%',
+                  style: theme.textTheme.bodyMedium
+                      ?.copyWith(fontWeight: FontWeight.w600),
+                ),
               ],
-            ],
+            ),
           ),
-        ),
       ],
     );
   }
@@ -992,48 +996,59 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
           ),
           const SizedBox(height: 12),
 
-          // ---- KPI cards ----
-          SizedBox(
-            height: 118,
-            child: Row(
-              children: [
-                Expanded(
-                  child: _statCard(theme, 'Transactions',
-                      '${filtered.length}', Icons.receipt_long,
-                      theme.colorScheme.primary),
+          // ---- KPI cards (2x2) ----
+          Column(
+            children: [
+              SizedBox(
+                height: 112,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _statCard(theme, 'Transactions',
+                          '${filtered.length}', Icons.receipt_long,
+                          theme.colorScheme.primary),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _statCard(theme, 'Total Amount',
+                          _compactAmount(totalAmount), Icons.currency_rupee,
+                          const Color(0xFF10B981)),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _statCard(theme, 'Total Amount',
-                      _compactAmount(totalAmount), Icons.currency_rupee,
-                      const Color(0xFF10B981)),
+              ),
+              const SizedBox(height: 10),
+              SizedBox(
+                height: 112,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _statCard(theme, 'Our Commission',
+                          _compactAmount(ourCommission), Icons.monetization_on,
+                          const Color(0xFFF59E0B)),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _statCard(
+                          theme,
+                          'Distributor',
+                          _compactAmount(distributorCommission),
+                          Icons.people,
+                          const Color(0xFF8B5CF6)),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _statCard(theme, 'Our Commission',
-                      _compactAmount(ourCommission), Icons.monetization_on,
-                      const Color(0xFFF59E0B)),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _statCard(
-                      theme,
-                      'Distributor',
-                      _compactAmount(distributorCommission),
-                      Icons.people,
-                      const Color(0xFF8B5CF6)),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
 
-          // ---- Bar chart ----
+          // ---- Line chart ----
           _sectionTitle(theme, 'Turnover',
               subtitle: _range == _Range.today ? 'By hour' : 'Per day / month'),
           Card(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(8, 20, 16, 8),
-              child: SizedBox(height: 200, child: _barChart(theme, filtered)),
+              child: SizedBox(height: 200, child: _lineChart(theme, filtered)),
             ),
           ),
 
