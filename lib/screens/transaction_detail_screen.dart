@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../models/transaction.dart';
 import '../providers/providers.dart';
 import '../utils/constants.dart';
 import '../utils/date_utils.dart';
@@ -10,6 +11,13 @@ class TransactionDetailScreen extends ConsumerWidget {
   final String transactionId;
 
   const TransactionDetailScreen({super.key, required this.transactionId});
+
+  static const _repeatableTypes = {
+    TransactionType.aeps,
+    TransactionType.aepsCashIn,
+    TransactionType.cashIn,
+    TransactionType.cashOut,
+  };
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -75,7 +83,8 @@ class TransactionDetailScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 16),
           _detailTile(context, theme, 'Customer Name', txn.customerName, Icons.person),
-          _detailTile(context, theme, 'Amount', '₹${txn.amount.toStringAsFixed(2)}', Icons.currency_rupee),
+          _detailTile(context, theme, 'Amount', '₹${txn.amount.toStringAsFixed(2)}',
+              Icons.currency_rupee, copyValue: txn.amount.toStringAsFixed(2)),
           if (txn.bankName != null)
             _detailTile(context, theme, 'Bank Name', txn.bankName!, Icons.account_balance),
           if (txn.aadhaarNumber != null)
@@ -85,7 +94,7 @@ class TransactionDetailScreen extends ConsumerWidget {
           if (txn.transactionId != null)
             _detailTile(context, theme, 'Transaction ID', txn.transactionId!, Icons.receipt),
           if (txn.utr != null && txn.utr!.isNotEmpty)
-            _detailTile(context, theme, 'UTR / Reference', txn.utr!, Icons.tag, copyable: true),
+            _detailTile(context, theme, 'UTR / Reference', txn.utr!, Icons.tag),
           if (txn.village != null && txn.village!.isNotEmpty)
             _detailTile(context, theme, 'Village', txn.village!, Icons.location_on),
           if (txn.phonePeAccount != null)
@@ -97,15 +106,54 @@ class TransactionDetailScreen extends ConsumerWidget {
             _detailTile(context, theme, 'From', _accountLabel(ref, txn.fromAccount!), Icons.arrow_forward),
             _detailTile(context, theme, 'To', _accountLabel(ref, txn.toAccount!), Icons.arrow_back),
           ],
-          _detailTile(context, theme, 'Balance After', '₹${txn.balanceAfterTransaction.toStringAsFixed(2)}', Icons.account_balance_wallet),
-          _detailTile(context, theme, 'Our Commission', '₹${txn.commission.toStringAsFixed(2)}', Icons.monetization_on),
+          _detailTile(context, theme, 'Balance After', '₹${txn.balanceAfterTransaction.toStringAsFixed(2)}',
+              Icons.account_balance_wallet,
+              copyValue: txn.balanceAfterTransaction.toStringAsFixed(2)),
+          _detailTile(context, theme, 'Our Commission', '₹${txn.commission.toStringAsFixed(2)}',
+              Icons.monetization_on,
+              copyValue: txn.commission.toStringAsFixed(2)),
           if (txn.distributorCommission > 0)
-            _detailTile(context, theme, 'Distributor Comm.', '₹${txn.distributorCommission.toStringAsFixed(2)}', Icons.people),
+            _detailTile(context, theme, 'Distributor Comm.', '₹${txn.distributorCommission.toStringAsFixed(2)}',
+                Icons.people,
+                copyValue: txn.distributorCommission.toStringAsFixed(2)),
           _detailTile(context, theme, 'Date & Time', txn.createdAt.displayDateTime, Icons.schedule),
           if (txn.notes != null && txn.notes!.isNotEmpty)
             _detailTile(context, theme, 'Notes', txn.notes!, Icons.notes),
+          if (_repeatableTypes.contains(txn.type)) ...[
+            const SizedBox(height: 24),
+            SizedBox(
+              height: 52,
+              child: FilledButton.icon(
+                onPressed: () => _sendAgain(context, txn),
+                icon: const Icon(Icons.replay),
+                label: Text('${txn.type.displayName} Again'),
+              ),
+            ),
+          ],
+          const SizedBox(height: 16),
         ],
       ),
+    );
+  }
+
+  void _sendAgain(BuildContext context, Transaction txn) {
+    final fields = <String, dynamic>{
+      'customerName': txn.customerName,
+      if (txn.mobileNumber != null && txn.mobileNumber!.isNotEmpty)
+        'mobileNumber': txn.mobileNumber,
+      if (txn.aadhaarNumber != null && txn.aadhaarNumber!.isNotEmpty)
+        'aadhaarNumber': txn.aadhaarNumber,
+      if (txn.bankName != null && txn.bankName!.isNotEmpty)
+        'bankName': txn.bankName,
+      if (txn.village != null && txn.village!.isNotEmpty)
+        'village': txn.village,
+    };
+    context.push(
+      '/new-transaction/${txn.type.name}',
+      extra: {
+        'fields': fields,
+        'matchedAccountId': txn.account,
+      },
     );
   }
 
@@ -122,27 +170,24 @@ class TransactionDetailScreen extends ConsumerWidget {
     String label,
     String value,
     IconData icon, {
-    bool copyable = false,
+    String? copyValue,
   }) {
+    final copyText = copyValue ?? value;
     return Card(
       child: ListTile(
-        onTap: copyable
-            ? () {
-                Clipboard.setData(ClipboardData(text: value));
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Copied "$value"'),
-                    duration: const Duration(seconds: 1),
-                  ),
-                );
-              }
-            : null,
+        onTap: () {
+          Clipboard.setData(ClipboardData(text: copyText));
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Copied "$copyText"'),
+              duration: const Duration(seconds: 1),
+            ),
+          );
+        },
         leading: Icon(icon, color: theme.colorScheme.primary),
         title: Text(label, style: theme.textTheme.bodySmall),
         subtitle: Text(value, style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w500)),
-        trailing: copyable
-            ? Icon(Icons.copy, size: 16, color: theme.colorScheme.onSurfaceVariant)
-            : null,
+        trailing: Icon(Icons.copy, size: 16, color: theme.colorScheme.onSurfaceVariant),
       ),
     );
   }

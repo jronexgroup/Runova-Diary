@@ -25,6 +25,7 @@ import '../screens/change_pin_screen.dart';
 import '../screens/adjust_balance_screen.dart';
 import '../screens/self_transfer_screen.dart';
 import '../screens/share_handler_screen.dart';
+import '../screens/regular_customers_screen.dart';
 import '../utils/constants.dart';
 
 final _navigatorKey = GlobalKey<NavigatorState>();
@@ -170,6 +171,17 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/self-transfer',
         builder: (_, __) => const SelfTransferScreen(),
+      ),
+      GoRoute(
+        path: '/regular-customers/:type',
+        builder: (_, state) {
+          final typeStr = state.pathParameters['type'] ?? 'aeps';
+          final type = TransactionType.values.firstWhere(
+            (e) => e.name == typeStr,
+            orElse: () => TransactionType.aeps,
+          );
+          return RegularCustomersScreen(type: type);
+        },
       ),
     ],
   );

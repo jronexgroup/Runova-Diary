@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import '../models/transaction.dart';
 import '../providers/providers.dart';
 import '../services/ai_service.dart';
 import '../utils/constants.dart';
@@ -52,6 +53,34 @@ class _NewTransactionScreenState extends ConsumerState<NewTransactionScreen> {
   bool _loading = false;
   bool _commissionOverridden = false;
   bool _autoCommission = true;
+
+  bool get _supportsRegularCustomers =>
+      widget.type == TransactionType.aeps ||
+      widget.type == TransactionType.aepsCashIn ||
+      widget.type == TransactionType.cashIn ||
+      widget.type == TransactionType.cashOut;
+
+  Future<void> _pickRegularCustomer() async {
+    final selected = await context.push<Transaction>(
+        '/regular-customers/${widget.type.name}');
+    if (selected == null || !mounted) return;
+    setState(() {
+      _customerNameController.text = selected.customerName;
+      _mobileController.text = selected.mobileNumber ?? '';
+      _aadhaarController.text = selected.aadhaarNumber ?? '';
+      _bankNameController.text = selected.bankName ?? '';
+      _villageController.text = selected.village ?? '';
+      if (selected.account != null) {
+        _selectedAccountId = selected.account;
+      }
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Filled details for ${selected.customerName}'),
+        duration: const Duration(seconds: 1),
+      ),
+    );
+  }
 
   @override
   void initState() {
@@ -465,9 +494,16 @@ class _NewTransactionScreenState extends ConsumerState<NewTransactionScreen> {
                   controller: _customerNameController,
                   focusNode: _customerNameFocus,
                   textInputAction: TextInputAction.next,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Customer Name *',
-                    prefixIcon: Icon(Icons.person),
+                    prefixIcon: const Icon(Icons.person),
+                    suffixIcon: _supportsRegularCustomers
+                        ? IconButton(
+                            tooltip: 'Regular customers',
+                            icon: const Icon(Icons.person_add_alt),
+                            onPressed: _pickRegularCustomer,
+                          )
+                        : null,
                   ),
                   textCapitalization: TextCapitalization.words,
                   validator: (v) =>

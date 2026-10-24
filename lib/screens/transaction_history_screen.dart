@@ -75,6 +75,7 @@ class _TransactionHistoryScreenState
   List<Transaction> _filteredTransactions(List<Transaction> all) {
     var filtered = all;
 
+    // Search always spans all time; date filters apply only when not searching.
     if (_searchController.text.isNotEmpty) {
       final query = _searchController.text.toLowerCase();
       filtered = filtered.where((t) {
@@ -84,12 +85,12 @@ class _TransactionHistoryScreenState
         if (t.bankName?.toLowerCase().contains(query) == true) return true;
         if (t.notes?.toLowerCase().contains(query) == true) return true;
         if (t.aadhaarNumber?.toLowerCase().contains(query) == true) return true;
+        if (t.utr?.toLowerCase().contains(query) == true) return true;
+        if (t.village?.toLowerCase().contains(query) == true) return true;
         if (t.type.displayName.toLowerCase().contains(query)) return true;
         return false;
       }).toList();
-    }
-
-    if (_startDate != null && _endDate != null) {
+    } else if (_startDate != null && _endDate != null) {
       final startKey = _startDate!.dateKey;
       final endKey = _endDate!.dateKey;
       filtered = filtered.where((t) =>
