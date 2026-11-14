@@ -169,6 +169,10 @@ class TransactionsNotifier extends StateNotifier<List<Transaction>> {
     await hive.deleteTransaction(oldTxn.userId, oldTxn.id);
     await hive.saveTransaction(newTxn);
     state = state.map((t) => t.id == oldTxn.id ? newTxn : t).toList();
+    _ref.read(syncServiceProvider).pushTransaction(newTxn);
+    if (oldTxn.createdAt.dateKey != newTxn.createdAt.dateKey) {
+      await _ref.read(balancesProvider.notifier).recalculateDayBalances(oldTxn.userId, oldTxn.createdAt.dateKey);
+    }
     await _ref.read(balancesProvider.notifier).recalculateDayBalances(newTxn.userId, newTxn.createdAt.dateKey);
   }
 

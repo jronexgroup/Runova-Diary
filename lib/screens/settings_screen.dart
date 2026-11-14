@@ -106,7 +106,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   leading: const Icon(Icons.sync),
                   title: const Text('Sync Now'),
                   onTap: () async {
-                    await ref.read(syncServiceProvider).syncToFirebase();
+                    await ref.read(syncServiceProvider).syncToFirebase(full: true);
                     if (!context.mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text('Sync completed')),
