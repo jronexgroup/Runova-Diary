@@ -3,17 +3,11 @@ class AiSettings {
   final bool enabled;
   final String model;
 
-  static const String defaultModel = 'google/diffusiongemma-26b-a4b-it';
+  static const String defaultModel = 'nvidia/nemotron-3.5-super-vl-120b-a12b';
 
   static const List<Map<String, String>> availableModels = [
-    {'id': 'google/diffusiongemma-26b-a4b-it', 'name': 'DiffusionGemma 26B', 'desc': 'Best accuracy, 15-30s'},
-    {'id': 'meta/llama-3.2-11b-vision-instruct', 'name': 'Llama 3.2 11B', 'desc': 'Fast (3-5s), good for quick scans'},
-    {'id': 'meta/llama-3.2-90b-vision-instruct', 'name': 'Llama 3.2 90B', 'desc': 'Larger, slower, may timeout'},
-    {'id': 'google/gemma-4-31b-it', 'name': 'Gemma 4 31B', 'desc': 'Experimental, may timeout'},
-    {'id': 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning', 'name': 'Nemotron 3 Nano Omni', 'desc': 'Experimental, often overloaded'},
-    {'id': 'z-ai/glm-5.3', 'name': 'GLM 5.3', 'desc': 'Experimental, may timeout'},
-    {'id': 'moonshotai/kimi-k3', 'name': 'Kimi K3', 'desc': 'Experimental, may timeout'},
-    {'id': 'deepseek-ai/deepseek-v4.1-flash', 'name': 'DeepSeek V4.1 Flash', 'desc': 'Experimental, may timeout'},
+    {'id': 'nvidia/nemotron-3.5-super-vl-120b-a12b', 'name': 'Nemotron 3.5 Super VL 120B', 'desc': 'Best accuracy, 10-60s (recommended)'},
+    {'id': 'meta/llama-3.2-90b-vision-instruct', 'name': 'Llama 3.2 90B Vision', 'desc': 'Fallback, slower (60s+)'},
   ];
 
   const AiSettings({

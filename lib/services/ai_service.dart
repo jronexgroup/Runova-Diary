@@ -62,6 +62,11 @@ class AiService {
   static const _maxRetries = 2;
   static const _maxDimension = 640;
   static const _jpegQuality = 50;
+  // Reasoning vision models (e.g. Nemotron 3.5 Super VL) need a large token
+  // budget for their internal reasoning before emitting the final JSON.
+  static const _maxTokens = 4096;
+  // Reasoning length varies per receipt (observed 10-60s); allow up to 120s.
+  static const _timeoutSeconds = 120;
   static final http.Client _httpClient = http.Client();
   final AiMonitorCallback? onMonitor;
   final _log = AiLogService();
@@ -184,7 +189,7 @@ class AiService {
             ],
           },
         ],
-        'max_tokens': 512,
+        'max_tokens': _maxTokens,
         'temperature': 0.1,
       });
 
@@ -199,7 +204,7 @@ class AiService {
             },
             body: body,
           )
-          .timeout(const Duration(seconds: 60));
+          .timeout(const Duration(seconds: _timeoutSeconds));
       _log.info('Response: ${resp.statusCode} in ${stopwatch.elapsedMilliseconds}ms');
 
       if (resp.statusCode == 429) {
@@ -232,7 +237,20 @@ class AiService {
         return AiResult(fields: {}, error: 'AI returned no response');
       }
 
-      final content = choices[0]['message']?['content'] as String?;
+      final message = choices[0]['message'] as Map<String, dynamic>?;
+      String? content = message?['content'] as String?;
+
+      // Reasoning models return their final answer in `content` only if the
+      // reasoning finished. If `content` is empty but `reasoning_content`
+      // exists, fall back to extracting JSON from the reasoning text.
+      if (content == null || content.isEmpty) {
+        final reasoning = message?['reasoning_content'] as String?;
+        if (reasoning != null && reasoning.isNotEmpty) {
+          _log.warn('content empty — extracting from reasoning_content instead');
+          content = reasoning;
+        }
+      }
+
       if (content == null || content.isEmpty) {
         _log.error('Empty response content');
         return AiResult(fields: {}, error: 'AI returned empty response');
